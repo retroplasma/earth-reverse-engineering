@@ -2,14 +2,14 @@
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DIR = './downloaded_files';
-let decoder = null;
+const OCTANT = "20527061605273514";
+const MAX_LEVEL = 20;
+
 /****************************************************************/
 
 const execSync = require('child_process').execSync;
 const fs = require('fs');
-
-const OCTANT = "20527061605273514";
-const MAX_LEVEL = 20;
+let decoder = null;
 
 /***************************** main *****************************/
 async function run() {
