@@ -9,6 +9,7 @@ const MAX_LEVEL = 20;
 
 const execSync = require('child_process').execSync;
 const fs = require('fs');
+const sharp = require('sharp');
 let decoder = null;
 
 /***************************** main *****************************/
@@ -66,8 +67,7 @@ async function run() {
 		var node = await getNode(nodePath, bulk, index);
 		var pre = prev;
 
-		node.meshes.forEach((v, k) => {
-
+		for (let [k, v] of Object.entries(node.meshes)) {
 			var res = "";
 			let meshIndex = k;
 			let objName = `${nodePath}_${meshIndex}`;
@@ -95,7 +95,7 @@ map_Kd ${texName}.png
 				// jpeg (saved as .jpg)
 				case 1:
 					fs.appendFileSync(`${dir}/${texName}.jpg`, new Buffer(new Buffer(tex.bytes)));
-					execSync(`sips -s format png ${dir}/${texName}.jpg --out ${dir}/${texName}.png`);
+					await sharp(`${dir}/${texName}.jpg`).toFile(`${dir}/${texName}.png`);
 					execSync(`rm ${dir}/${texName}.jpg`);
 					break;
 				// dxt1 (saved as .ppm)
@@ -117,7 +117,7 @@ map_Kd ${texName}.png
 
 					fs.appendFileSync(`${dir}/${texName}.ppm`, `P6\n${tex.width} ${tex.height}\n255\n`);
 					fs.appendFileSync(`${dir}/${texName}.ppm`, new Buffer(rgbData));
-					execSync(`sips -s format png ${dir}/${texName}.ppm --out ${dir}/${texName}.png`);
+					await sharp(`${dir}/${texName}.ppm`).toFile(`${dir}/${texName}.png`);
 					execSync(`rm ${dir}/${texName}.ppm`);
 					break;
 				default:
@@ -125,7 +125,7 @@ map_Kd ${texName}.png
 			}
 
 			pre = obj;
-		})
+		}
 		return pre;
 	}
 
