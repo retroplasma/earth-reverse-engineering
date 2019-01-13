@@ -23,4 +23,18 @@ Notes
           - ❹: epoch
           - ❺: texture format
           - ❻: imagery epoch (sometimes)
+
+General info:
+ - Everything is stored in an octree.
+
+Roles of resources:
+ - PlanetoidMetadata points to first BulkMetaData.
+ - BulkMetaData points to other BulkMetaData and to NodeData.
+ - NodeData contains actual meshes and textures.
+
+Versioning:
+ - BulkMetaData and NodeData are versioned using epoch numbers.
+ - PlanetoidMetadata provides epoch of first BulkMetaData.
+ - BulkMetaData provides epochs of underlying resources.
+ - Current version of a resource can be determined recursively.
 ```
