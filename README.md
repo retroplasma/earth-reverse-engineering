@@ -3,7 +3,7 @@
 Earth to OBJ file downloader
 ```
 npm install
-node index.js
+node index.js [octant] [max_level]
 ```
 
 Notes
