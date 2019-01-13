@@ -2,11 +2,31 @@
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DIR = './downloaded_files';
-const OCTANT = "20527061605273514";
-const MAX_LEVEL = 20;
-
 /****************************************************************/
 
+/*************************** cmd line ***************************/
+function cmd() {
+	let errors = [];
+	let [octant, max_level] = process.argv.slice(2);
+	if ([octant, max_level].includes(undefined)) {
+		errors.push(null);
+	} else {
+		if (!/^[0-7]{2,32}$/.test(octant)) errors.push('Invalid octant.');
+		if (!/^\d{1,2}$/.test(max_level)) errors.push('Invalid max_level.');
+	}
+	if (errors.length > 0) {
+		const invoc = `node ${require('path').basename(__filename)}`;
+		console.error(`Usage:`);
+		console.error(`  ${invoc} [octant] [max_level]`);
+		console.error(`  ${invoc} 20527061605273514 20`);
+		errors.filter(e => e).forEach(e => console.error(`Error: ${e}`));
+		process.exit(1);
+	}
+	return [octant, parseInt(max_level)];
+}
+/****************************************************************/
+
+const [OCTANT, MAX_LEVEL] = cmd();
 const execSync = require('child_process').execSync;
 const fs = require('fs');
 const sharp = require('sharp');
