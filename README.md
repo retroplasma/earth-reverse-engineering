@@ -1,5 +1,10 @@
 ![example](example.jpg "example")
 
+You can use docker to run without install npm or node
+
+
+docker run -it --rm --name example -v "$PWD":/usr/src/app -w /usr/src/app node:7 npm install
+
 Earth to OBJ file downloader
 ```
 npm install
