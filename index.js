@@ -8,29 +8,33 @@ const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [1/30, 89946, 141738, -1
 /*************************** cmd line ***************************/
 function cmd() {
 	let errors = [];
-	let [octant, max_level] = process.argv.slice(2);
+	let argv = process.argv.slice(2);
+	let other = argv.slice(2);
+	let [octant, max_level] = argv;	
 	if ([octant, max_level].includes(undefined)) {
 		errors.push(null);
 	} else {
 		if (!/^[0-7]{2,32}$/.test(octant)) errors.push('Invalid octant.');
 		if (!/^\d{1,2}$/.test(max_level)) errors.push('Invalid max_level.');
+		if (other.filter(o => !['--disable_png'].includes(o)).length > 0) errors.push('Invalid parameters.');
 	}
 	if (errors.length > 0) {
 		const invoc = `node ${require('path').basename(__filename)}`;
 		console.error(`Usage:`);
-		console.error(`  ${invoc} [octant] [max_level]`);
+		console.error(`  ${invoc} [octant] [max_level] [[--disable_png]]`);
 		console.error(`  ${invoc} 20527061605273514 20`);
 		errors.filter(e => e).forEach(e => console.error(`Error: ${e}`));
 		process.exit(1);
 	}
-	return [octant, parseInt(max_level)];
+	return [octant, parseInt(max_level), !other.includes('--disable_png')];
 }
 /****************************************************************/
 
-const [OCTANT, MAX_LEVEL] = cmd();
+const [OCTANT, MAX_LEVEL, CONVERT_TO_PNG] = cmd();
+
 const execSync = require('child_process').execSync;
 const fs = require('fs');
-const sharp = require('sharp');
+const sharp = CONVERT_TO_PNG ? require('sharp') : null;
 let decoder = null;
 
 /***************************** main *****************************/
@@ -101,6 +105,15 @@ async function run() {
 			fs.appendFileSync(`${dir}/model.obj`, `usemtl ${texName}\n`);
 			fs.appendFileSync(`${dir}/model.obj`, res);
 
+			
+			const texFmts = {
+				1: { ext: 'jpg' },
+				6: { ext: 'ppm' },
+			};
+
+			if (!texFmts[tex.textureFormat]) throw new Error("can't handle texture format");
+			const ext = CONVERT_TO_PNG ? 'png' : texFmts[tex.textureFormat].ext;
+
 			fs.appendFileSync(`${dir}/model.mtl`, `
 newmtl ${texName}
 Ka 1.000000 1.000000 1.000000
@@ -109,15 +122,17 @@ Ks 0.000000 0.000000 0.000000
 Tr 1.000000
 illum 1
 Ns 0.000000
-map_Kd ${texName}.png
+map_Kd ${texName}.${ext}
 			`);
 
 			switch (tex.textureFormat) {
 				// jpeg (saved as .jpg)
 				case 1:
 					fs.appendFileSync(`${dir}/${texName}.jpg`, new Buffer(new Buffer(tex.bytes)));
-					await sharp(`${dir}/${texName}.jpg`).toFile(`${dir}/${texName}.png`);
-					execSync(`rm ${dir}/${texName}.jpg`);
+					if (CONVERT_TO_PNG) {
+						await sharp(`${dir}/${texName}.jpg`).toFile(`${dir}/${texName}.png`);
+						execSync(`rm ${dir}/${texName}.jpg`);
+					}
 					break;
 				// dxt1 (saved as .ppm)
 				case 6:
@@ -138,11 +153,11 @@ map_Kd ${texName}.png
 
 					fs.appendFileSync(`${dir}/${texName}.ppm`, `P6\n${tex.width} ${tex.height}\n255\n`);
 					fs.appendFileSync(`${dir}/${texName}.ppm`, new Buffer(rgbData));
-					await sharp(`${dir}/${texName}.ppm`).toFile(`${dir}/${texName}.png`);
-					execSync(`rm ${dir}/${texName}.ppm`);
+					if (CONVERT_TO_PNG) {
+						await sharp(`${dir}/${texName}.ppm`).toFile(`${dir}/${texName}.png`);
+						execSync(`rm ${dir}/${texName}.ppm`);
+					}
 					break;
-				default:
-					throw new Error("can't handle texture format")
 			}
 
 			pre = obj;

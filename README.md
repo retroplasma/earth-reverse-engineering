@@ -3,7 +3,7 @@
 Earth to OBJ file downloader
 ```
 npm install
-node index.js [octant] [max_level]
+node index.js [octant] [max_level] [[--disable_png]]
 
 # example.jpg
 node index.js 20527061605273514 20
