@@ -2,7 +2,7 @@
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DIR = './downloaded_files';
-const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [0.3, 89946, 141738, -130075]; // prevents jitter in 3d viewers
+const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [1/30, 89946, 141738, -130075]; // prevents jitter in 3d viewers
 /****************************************************************/
 
 /*************************** cmd line ***************************/
