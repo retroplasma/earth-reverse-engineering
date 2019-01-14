@@ -2,6 +2,7 @@
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DIR = './downloaded_files';
+const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [0.3, 89946, 141738, -130075]; // prevents jitter in 3d viewers
 /****************************************************************/
 
 /*************************** cmd line ***************************/
@@ -243,7 +244,7 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 		z = _z;
 
 		// hack: scale and move to keep 3d viewer from jittering
-		console.log(`v ${x / 30 + 89946} ${y / 30 + 141738} ${z / 30 - 130075}`);
+		console.log(`v ${x * OBJ_SCALE + OBJ_MOVE_X} ${y * OBJ_SCALE + OBJ_MOVE_Y} ${z * OBJ_SCALE + OBJ_MOVE_Z}`);
 
 		c_v++;
 	}
