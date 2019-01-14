@@ -41,3 +41,5 @@ Versioning:
  - BulkMetaData provides epochs of underlying resources.
  - Current version of a resource can be determined recursively.
 ```
+
+Related ideas: [Racing game](https://www.reddit.com/r/Showerthoughts/comments/aex25s/race_car_video_games_could_be_amazing_if_they/) , [Minimal client](https://github.com/kaylathedev/google-maps-3d-client). WebGL + CORS should work ([test](https://retroplasma.github.io/get_planetoid_metadata.html)).
