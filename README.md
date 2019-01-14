@@ -44,6 +44,14 @@ Versioning:
  - PlanetoidMetadata provides epoch of first BulkMetaData.
  - BulkMetaData provides epochs of underlying resources.
  - Current version of a resource can be determined recursively.
+ 
+NodeData:
+ - Vertex Buffer:
+    - 8 bytes per point: X,Y,Z,W,U,U,V,V
+    - XYZ: position, W: octant mask, UV: texture coordinates
+ - Texture:
+    - Format 1: JPEG
+    - Format 6: S3 DXT1 RGB
 ```
 
 Related ideas: [Racing game](https://www.reddit.com/r/Showerthoughts/comments/aex25s/race_car_video_games_could_be_amazing_if_they/) , [Minimal client](https://github.com/kaylathedev/google-maps-3d-client). WebGL + CORS should work ([test](https://retroplasma.github.io/get_planetoid_metadata.html)).
