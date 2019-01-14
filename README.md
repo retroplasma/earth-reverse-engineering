@@ -9,6 +9,10 @@ node index.js [octant] [max_level]
 node index.js 20527061605273514 20
 ```
 
+![find octant](how_to_find_octant.jpg "open maps and dev tools, switch to satellite, fly to destination, search for NodeData, copy octant path from recent request")
+
+
+
 Notes
 ```
 "https://kh.google.com/rt/🅐/🅑"
