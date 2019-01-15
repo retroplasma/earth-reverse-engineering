@@ -486,7 +486,12 @@ function initDecoder() {
 (async function program() {
 	decoder = initDecoder();
 	await run();
-})();
+})().then(() => {
+	process.exit(0);
+}).catch(e => {
+	console.error(e);
+	process.exit(1);
+});
 
 /***********************************************
 * https://github.com/kchapelier/decode-dxt.git *
