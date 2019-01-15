@@ -3,7 +3,7 @@
 # to keep 3d viewer from jittering
 # scales all *.obj and saves as *.2.obj
 # you might want to change these constants
-export OBJ_SCALE=0.333333
+export OBJ_SCALE=0.0333333
 export OBJ_MOVE_X=89946
 export OBJ_MOVE_Y=141738
 export OBJ_MOVE_Z=-130075
