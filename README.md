@@ -1,3 +1,5 @@
+[![Gitter Chat](https://badges.gitter.im/earth-reverse-engineering/lobby.svg)](https://gitter.im/earth-reverse-engineering/lobby)
+
 ![example](example.jpg "example")
 
 Earth to OBJ file downloader
