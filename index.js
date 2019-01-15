@@ -37,9 +37,8 @@ const [DUMP_JSON_DIR, DUMP_RAW_DIR] = [DL_DIR + '/json', DL_DIR + '/raw'];
 
 let execSync = require('child_process').execSync;
 const fs = require('fs');
-const bmp = require('bmp-js');
-const decodeDXT = require('decode-dxt');
 const decodeResource = require('./lib/decode-resource');
+const decodeTexture = require('./lib/decode-texture');
 
 if (DUMP_JSON || DUMP_RAW) {
 	DUMP_JSON && execSync(`mkdir -p ${DUMP_JSON_DIR}`);
@@ -121,54 +120,20 @@ async function run() {
 			fs.appendFileSync(`${dir}/model.obj`, `usemtl ${texName}\n`);
 			fs.appendFileSync(`${dir}/model.obj`, res);
 
-			
-			const texFmts = {
-				1: { ext: 'jpg' },
-				6: { ext: 'bmp' },
-			};
-
-			if (!texFmts[tex.textureFormat]) throw new Error("can't handle texture format");
-			const ext = texFmts[tex.textureFormat].ext;
+			const {buffer: buf, extension: ext} = decodeTexture(tex);
 
 			fs.appendFileSync(`${dir}/model.mtl`, `
-newmtl ${texName}
-Ka 1.000000 1.000000 1.000000
-Kd 1.000000 1.000000 1.000000
-Ks 0.000000 0.000000 0.000000
-Tr 1.000000
-illum 1
-Ns 0.000000
-map_Kd ${texName}.${ext}
-			`);
+				newmtl ${texName}
+				Ka 1.000000 1.000000 1.000000
+				Kd 1.000000 1.000000 1.000000
+				Ks 0.000000 0.000000 0.000000
+				Tr 1.000000
+				illum 1
+				Ns 0.000000
+				map_Kd ${texName}.${ext}
+			`.split('\n').map(s => s.trim()).join('\n'));
 
-			switch (tex.textureFormat) {
-				// jpeg (saved as .jpg)
-				case 1:
-					fs.appendFileSync(`${dir}/${texName}.jpg`, new Buffer(new Buffer(tex.bytes)));
-					break;
-				// dxt1 (saved as .ppm)
-				case 6:
-					var bytes = tex.bytes
-					var buf = new Buffer(bytes);
-					var abuf = new Uint8Array(buf).buffer;
-					var imageDataView = new DataView(abuf, 0, bytes.length);
-					var rgbaData = decodeDXT(imageDataView, tex.width, tex.height, 'dxt1');
-					var bmpData = [];
-
-					// ABGR
-					for (var i = 0; i < rgbaData.length; i += 4) {
-						bmpData.push(255);
-						bmpData.push(rgbaData[i + 2]);
-						bmpData.push(rgbaData[i + 1]);
-						bmpData.push(rgbaData[i + 0]);
-					}
-
-					var rawData = bmp.encode({
-						data: bmpData, width: tex.width, height: tex.height,
-					});
-					fs.appendFileSync(`${dir}/${texName}.bmp`, rawData.data);
-					break;
-			}
+			fs.appendFileSync(`${dir}/${texName}.${ext}`, buf);
 
 			pre = obj;
 		}
