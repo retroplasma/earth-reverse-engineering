@@ -1,3 +1,5 @@
+"use strict"
+
 /**************************** config ****************************/
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
@@ -255,7 +257,7 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 		var _z = 0;
 		var _w = 0;
 
-		ma = payload.matrixGlobeFromMesh;
+		const ma = payload.matrixGlobeFromMesh;
 		_x = x * ma[0] + y * ma[4] + z * ma[8] + w * ma[12];
 		_y = x * ma[1] + y * ma[5] + z * ma[9] + w * ma[13];
 		_z = x * ma[2] + y * ma[6] + z * ma[10] + w * ma[14];
@@ -306,7 +308,7 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 		var _z = 0;
 		var _w = 0;
 
-		ma = payload.matrixGlobeFromMesh;
+		const ma = payload.matrixGlobeFromMesh;
 		_x = x * ma[0] + y * ma[4] + z * ma[8] + w * ma[12];
 		_y = x * ma[1] + y * ma[5] + z * ma[9] + w * ma[13];
 		_z = x * ma[2] + y * ma[6] + z * ma[10] + w * ma[14];
@@ -459,6 +461,7 @@ function initDecoder() {
 		}
 	}
 
+	let self = {};
 	if (typeof self !== 'undefined') {
 		let tmp = self;
 		self = ctx;
@@ -467,7 +470,6 @@ function initDecoder() {
 	} else {
 		self = ctx;
 		code();
-		delete self;
 	}
 
 	return {
@@ -656,12 +658,11 @@ function decodeDXT(imageDataView, width, height, format) {
 	function decode(imageDataView, width, height, format) {
 
 		if (format === decode.dxt1) {
-			result = decodeBC1(imageDataView, width, height);
+			return decodeBC1(imageDataView, width, height);
 		} else {
 			throw new Error('Unknown DXT format : \'' + format + '\'');
 		}
-
-		return result;
+		
 	}
 
 	decode.dxt1 = 'dxt1';
