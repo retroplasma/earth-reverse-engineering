@@ -17,7 +17,8 @@
   },
   "homepage": "https://github.com/retroplasma/earth-reverse-engineering#readme",
   "dependencies": {
-    "sharp": "^0.21.1",
-    "shelljs": "git+https://github.com/shelljs/shelljs.git"
+    "shelljs": "0.8.3",
+    "bmp-js": "^0.1.0",
+    "decode-dxt": "^1.0.1"
   }
 }

@@ -12,4 +12,4 @@ bpy.data.textures["Kd.002"].extension = 'EXTEND'
 for x in bpy.data.textures: x.extension = 'EXTEND'
 ```
 
-Everything jitters? Try changing [these constants](https://github.com/retroplasma/earth-reverse-engineering/blob/master/index.js#L5).
+Everything jitters? Try [bash scale_move_obj.sh](scale_move_obj.sh) and then open `model.2.obj` instead of `model.obj`.
