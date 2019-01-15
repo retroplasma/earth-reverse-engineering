@@ -1,7 +1,7 @@
 /**************************** config ****************************/
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
-const DIR = './downloaded_files';
+let DL_DIR = './downloaded_files';
 const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [1/30, 89946, 141738, -130075]; // prevents jitter in 3d viewers
 /****************************************************************/
 
@@ -9,39 +9,52 @@ const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [1/30, 89946, 141738, -1
 function cmd() {
 	let errors = [];
 	let argv = process.argv.slice(2);
-	let other = argv.slice(2);
+	let optional = argv.slice(2);
 	let [octant, max_level] = argv;	
 	if ([octant, max_level].includes(undefined)) {
 		errors.push(null);
 	} else {
 		if (!/^[0-7]{2,32}$/.test(octant)) errors.push('Invalid octant.');
 		if (!/^\d{1,2}$/.test(max_level)) errors.push('Invalid max_level.');
-		if (other.filter(o => ![/* optional params */].includes(o)).length > 0) errors.push('Invalid parameters.');
+		if (optional.filter(o => !['--dump-json', '--dump-raw'].includes(o)).length > 0) errors.push('Invalid parameters.');
 	}
 	if (errors.length > 0) {
 		const invoc = `node ${require('path').basename(__filename)}`;
 		console.error(`Usage:`);
-		console.error(`  ${invoc} [octant] [max_level]`);
+		console.error(`  ${invoc} [octant] [max_level] [[--dump-json]] [[--dump-raw]]`);
 		console.error(`  ${invoc} 20527061605273514 20`);
 		errors.filter(e => e).forEach(e => console.error(`Error: ${e}`));
 		process.exit(1);
 	}
-	return [octant, parseInt(max_level)];
+	return [octant, parseInt(max_level), optional.includes('--dump-json'), optional.includes('--dump-raw')];
 }
 /****************************************************************/
 
-const [OCTANT, MAX_LEVEL] = cmd();
+const [OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW] = cmd();
+const [DUMP_JSON_DIR, DUMP_RAW_DIR] = [DL_DIR + '/json', DL_DIR + '/raw'];
 
-const execSync = require('child_process').execSync;
+let execSync = require('child_process').execSync;
 const fs = require('fs');
 const bmp = require('bmp-js');
 let decoder = null;
+
+if (DUMP_JSON || DUMP_RAW) {
+	DUMP_JSON && execSync(`mkdir -p ${DUMP_JSON_DIR}`);
+	DUMP_RAW && execSync(`mkdir -p ${DUMP_RAW_DIR}`);
+	execSync = () => {};
+	fs._appendFileSync = fs.appendFileSync;
+	fs._writeFileSync = fs.writeFileSync;
+	fs.appendFileSync = () => {};
+	fs.writeFileSync = () => {};
+}
 
 /***************************** main *****************************/
 async function run() {
 
 	let planetoid = await getPlanetoid();
 	let rootEpoch = planetoid.bulkMetadataEpoch[0];
+	const DIR = DL_DIR + `/obj/${OCTANT}-${MAX_LEVEL}-${rootEpoch}`;
+
 	let dir = DIR;
 
 	execSync(`rm -Rf ${dir}`);
@@ -403,6 +416,13 @@ async function decode(command, url) {
 	if (CACHE_ENABLED) {
 		cache[url] = res;
 	}
+
+	if (DUMP_JSON || DUMP_RAW) {
+		const fn = url.replace('/pb=', '');
+		DUMP_JSON && fs._writeFileSync(`${DUMP_JSON_DIR}/${fn}.json`, JSON.stringify(res, null, 2));
+		DUMP_RAW && fs._writeFileSync(`${DUMP_RAW_DIR}/${fn}.raw`, payload);
+	}
+
 	return res;
 }
 
