@@ -1,7 +1,7 @@
 /**************************** config ****************************/
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
-const DIR = './downloaded_files';
+const DIR = 'downloaded_files';
 const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [1/30, 89946, 141738, -130075]; // prevents jitter in 3d viewers
 /****************************************************************/
 
@@ -28,7 +28,8 @@ function cmd() {
 /****************************************************************/
 
 const [OCTANT, MAX_LEVEL] = cmd();
-const execSync = require('child_process').execSync;
+const path = require('path');
+const shell = require('shelljs');
 const fs = require('fs');
 const sharp = require('sharp');
 let decoder = null;
@@ -40,9 +41,9 @@ async function run() {
 	let rootEpoch = planetoid.bulkMetadataEpoch[0];
 	let dir = DIR;
 
-	execSync(`rm -Rf ${dir}`);
-	execSync(`mkdir -p ${dir}`);
-	fs.appendFileSync(`${dir}/model.obj`, `mtllib model.mtl\n`);
+        shell.rm('-Rf', dir);
+        shell.mkdir('-p', dir);
+	fs.appendFileSync(path.join(dir,'model.obj'), `mtllib model.mtl\n`);
 
 	async function possNext(nodePath, forceAll = false) {
 		for (var bulk = null, epoch = rootEpoch, index = -1, i = 4; i < nodePath.length + 4; i += 4) {
@@ -98,10 +99,10 @@ async function run() {
 			let tex = node.meshes[meshIndex].texture;
 			let texName = `tex_${nodePath}_${meshIndex}`;
 
-			fs.appendFileSync(`${dir}/model.obj`, `usemtl ${texName}\n`);
-			fs.appendFileSync(`${dir}/model.obj`, res);
+			fs.appendFileSync(path.join(dir,'model.obj'), `usemtl ${texName}\n`);
+			fs.appendFileSync(path.join(dir,'model.obj'), res);
 
-			fs.appendFileSync(`${dir}/model.mtl`, `
+			fs.appendFileSync(path.join(dir,'model.mtl'), `
 newmtl ${texName}
 Ka 1.000000 1.000000 1.000000
 Kd 1.000000 1.000000 1.000000
@@ -115,9 +116,9 @@ map_Kd ${texName}.png
 			switch (tex.textureFormat) {
 				// jpeg (saved as .jpg)
 				case 1:
-					fs.appendFileSync(`${dir}/${texName}.jpg`, new Buffer(new Buffer(tex.bytes)));
-					await sharp(`${dir}/${texName}.jpg`).toFile(`${dir}/${texName}.png`);
-					execSync(`rm ${dir}/${texName}.jpg`);
+					fs.appendFileSync(path.join(dir,`${texName}.jpg`), new Buffer(new Buffer(tex.bytes)));
+					await sharp(path.join(dir,`${texName}.jpg`)).toFile(path.join(dir,`${texName}.png`));
+                                        shell.rm(path.join(dir,`${texName}.jpg`));
 					break;
 				// dxt1 (saved as .ppm)
 				case 6:
@@ -136,10 +137,10 @@ map_Kd ${texName}.png
 						rgbData.push(rgbaData[i])
 					}
 
-					fs.appendFileSync(`${dir}/${texName}.ppm`, `P6\n${tex.width} ${tex.height}\n255\n`);
-					fs.appendFileSync(`${dir}/${texName}.ppm`, new Buffer(rgbData));
-					await sharp(`${dir}/${texName}.ppm`).toFile(`${dir}/${texName}.png`);
-					execSync(`rm ${dir}/${texName}.ppm`);
+					fs.appendFileSync(path.join(dir,`${texName}.ppm`), `P6\n${tex.width} ${tex.height}\n255\n`);
+					fs.appendFileSync(path.join(dir,`${texName}.ppm`), new Buffer(rgbData));
+					await sharp(path.join(dir,`${texName}.ppm`)).toFile(path.join(dir,`${texName}.png`));
+                                        shell.rm(path.join(dir,`${texName}.ppm`));
 					break;
 				default:
 					throw new Error("can't handle texture format")
