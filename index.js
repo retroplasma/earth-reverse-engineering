@@ -16,25 +16,25 @@ function cmd() {
 	} else {
 		if (!/^[0-7]{2,32}$/.test(octant)) errors.push('Invalid octant.');
 		if (!/^\d{1,2}$/.test(max_level)) errors.push('Invalid max_level.');
-		if (other.filter(o => !['--disable_png'].includes(o)).length > 0) errors.push('Invalid parameters.');
+		if (other.filter(o => ![/* optional params */].includes(o)).length > 0) errors.push('Invalid parameters.');
 	}
 	if (errors.length > 0) {
 		const invoc = `node ${require('path').basename(__filename)}`;
 		console.error(`Usage:`);
-		console.error(`  ${invoc} [octant] [max_level] [[--disable_png]]`);
+		console.error(`  ${invoc} [octant] [max_level]`);
 		console.error(`  ${invoc} 20527061605273514 20`);
 		errors.filter(e => e).forEach(e => console.error(`Error: ${e}`));
 		process.exit(1);
 	}
-	return [octant, parseInt(max_level), !other.includes('--disable_png')];
+	return [octant, parseInt(max_level)];
 }
 /****************************************************************/
 
-const [OCTANT, MAX_LEVEL, CONVERT_TO_PNG] = cmd();
+const [OCTANT, MAX_LEVEL] = cmd();
 
 const execSync = require('child_process').execSync;
 const fs = require('fs');
-const sharp = CONVERT_TO_PNG ? require('sharp') : null;
+const bmp = require('bmp-js');
 let decoder = null;
 
 /***************************** main *****************************/
@@ -108,11 +108,11 @@ async function run() {
 			
 			const texFmts = {
 				1: { ext: 'jpg' },
-				6: { ext: 'ppm' },
+				6: { ext: 'bmp' },
 			};
 
 			if (!texFmts[tex.textureFormat]) throw new Error("can't handle texture format");
-			const ext = CONVERT_TO_PNG ? 'png' : texFmts[tex.textureFormat].ext;
+			const ext = texFmts[tex.textureFormat].ext;
 
 			fs.appendFileSync(`${dir}/model.mtl`, `
 newmtl ${texName}
@@ -129,10 +129,6 @@ map_Kd ${texName}.${ext}
 				// jpeg (saved as .jpg)
 				case 1:
 					fs.appendFileSync(`${dir}/${texName}.jpg`, new Buffer(new Buffer(tex.bytes)));
-					if (CONVERT_TO_PNG) {
-						await sharp(`${dir}/${texName}.jpg`).toFile(`${dir}/${texName}.png`);
-						execSync(`rm ${dir}/${texName}.jpg`);
-					}
 					break;
 				// dxt1 (saved as .ppm)
 				case 6:
@@ -141,22 +137,20 @@ map_Kd ${texName}.${ext}
 					var abuf = new Uint8Array(buf).buffer;
 					var imageDataView = new DataView(abuf, 0, bytes.length);
 					var rgbaData = decodeDXT(imageDataView, tex.width, tex.height, 'dxt1');
-					var rgbData = [];
+					var bmpData = [];
 
-					// get rid of constant alpha
-					for (var i = 0; i < rgbaData.length; i++) {
-						if (i % 4 == 3) {
-							continue;
-						}
-						rgbData.push(rgbaData[i])
+					// ABGR
+					for (var i = 0; i < rgbaData.length; i += 4) {
+						bmpData.push(255);
+						bmpData.push(rgbaData[i + 2]);
+						bmpData.push(rgbaData[i + 1]);
+						bmpData.push(rgbaData[i + 0]);
 					}
 
-					fs.appendFileSync(`${dir}/${texName}.ppm`, `P6\n${tex.width} ${tex.height}\n255\n`);
-					fs.appendFileSync(`${dir}/${texName}.ppm`, new Buffer(rgbData));
-					if (CONVERT_TO_PNG) {
-						await sharp(`${dir}/${texName}.ppm`).toFile(`${dir}/${texName}.png`);
-						execSync(`rm ${dir}/${texName}.ppm`);
-					}
+					var rawData = bmp.encode({
+						data: bmpData, width: tex.width, height: tex.height,
+					});
+					fs.appendFileSync(`${dir}/${texName}.bmp`, rawData.data);
 					break;
 			}
 
