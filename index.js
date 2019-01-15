@@ -5,7 +5,6 @@ const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DL_DIR = './downloaded_files';
 const [DUMP_JSON_DIR, DUMP_RAW_DIR] = [DL_DIR + '/json', DL_DIR + '/raw'];
-const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [1/30, 89946, 141738, -130075]; // prevents jitter in 3d viewers
 
 const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW} = require('./lib/parse-command-line')(process.argv.slice(2));
 /****************************************************************/
@@ -209,8 +208,7 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 		y = _y;
 		z = _z;
 
-		// hack: scale and move to keep 3d viewer from jittering
-		console.log(`v ${x * OBJ_SCALE + OBJ_MOVE_X} ${y * OBJ_SCALE + OBJ_MOVE_Y} ${z * OBJ_SCALE + OBJ_MOVE_Z}`);
+		console.log(`v ${x} ${y} ${z}`);
 
 		c_v++;
 	}

@@ -11,6 +11,10 @@ node index.js [octant] [max_level] [[--dump-json]] [[--dump-raw]]
 # dump textured obj (octant from example.jpg)
 node index.js 20527061605273514 20
 
+# prevents 3d viewers like blender from jittering
+# produces scaled + moved model.2.obj from model.obj
+bash scale_move_obj.sh
+
 # dump json and raw data
 node index.js 20527061605273514 20 --dump-json --dump-raw
 ```
