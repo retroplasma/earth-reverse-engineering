@@ -14,6 +14,7 @@ let execSync = require('child_process').execSync;
 const fs = require('fs');
 const decodeResource = require('./lib/decode-resource');
 const decodeTexture = require('./lib/decode-texture');
+const getUrl = require('./lib/get-url');
 
 if (DUMP_JSON || DUMP_RAW) {
 	DUMP_JSON && execSync(`mkdir -p ${DUMP_JSON_DIR}`);
@@ -28,39 +29,39 @@ if (DUMP_JSON || DUMP_RAW) {
 /***************************** main *****************************/
 async function run() {
 
-	let planetoid = await getPlanetoid();
-	let rootEpoch = planetoid.bulkMetadataEpoch[0];
+	const planetoid = await getPlanetoid();
+	const rootEpoch = planetoid.bulkMetadataEpoch[0];
 	const DIR = DL_DIR + `/obj/${OCTANT}-${MAX_LEVEL}-${rootEpoch}`;
-
-	let dir = DIR;
+	const dir = DIR;
 
 	execSync(`rm -Rf ${dir}`);
 	execSync(`mkdir -p ${dir}`);
 	fs.appendFileSync(`${dir}/model.obj`, `mtllib model.mtl\n`);
 
 	async function possNext(nodePath, forceAll = false) {
-		for (var bulk = null, epoch = rootEpoch, index = -1, i = 4; i < nodePath.length + 4; i += 4) {
-			let bulkPath = nodePath.substring(0, i - 4);
-			let subPath = nodePath.substring(0, i);
+		let bulk = null, index = -1;
+		for (let epoch = rootEpoch, i = 4; i < nodePath.length + 4; i += 4) {
+			const bulkPath = nodePath.substring(0, i - 4);
+			const subPath = nodePath.substring(0, i);
 
-			let nextBulk = await getBulk(bulkPath, epoch);
+			const nextBulk = await getBulk(bulkPath, epoch);
 			bulk = nextBulk;
 			index = traverse(subPath, bulk.childIndices);
 			epoch = bulk.bulkMetadataEpoch[index];
 		}
 		if (index < 0) throw new Error('Node not available');
-		var node = await getNode(nodePath, bulk, index);
+		const node = await getNode(nodePath, bulk, index);
 
 		if (forceAll) return [0, 1, 2, 3, 4, 5, 6, 7]
 
 		// hax
-		var dict = {}
+		const dict = {}
 		node.meshes.forEach(mesh => {
-			for (var i = 0; i < mesh.vertices.length; i += 8) {
+			for (let i = 0; i < mesh.vertices.length; i += 8) {
 				dict[mesh.vertices[i + 3]] = true
 			}
 		})
-		var keys = Object.keys(dict).map(k => parseInt(k));
+		const keys = Object.keys(dict).map(k => parseInt(k));
 		if (keys.filter(k => k >= 0 && k <= 7).length != keys.length) {
 			throw new Error("invalid w: " + keys);
 		}
@@ -68,29 +69,29 @@ async function run() {
 	}
 
 	async function extract(nodePath, prev, exclude) {
+		let bulk = null, index = -1;
+		for (let epoch = rootEpoch, i = 4; i < nodePath.length + 4; i += 4) {
+			const bulkPath = nodePath.substring(0, i - 4);
+			const subPath = nodePath.substring(0, i);
 
-		for (var bulk = null, epoch = rootEpoch, index = -1, i = 4; i < nodePath.length + 4; i += 4) {
-			let bulkPath = nodePath.substring(0, i - 4);
-			let subPath = nodePath.substring(0, i);
-
-			let nextBulk = await getBulk(bulkPath, epoch);
+			const nextBulk = await getBulk(bulkPath, epoch);
 			bulk = nextBulk;
 			index = traverse(subPath, bulk.childIndices);
 			epoch = bulk.bulkMetadataEpoch[index];
 		}
 		if (index < 0) throw new Error('Node not available');
-		var node = await getNode(nodePath, bulk, index);
-		var pre = prev;
+		const node = await getNode(nodePath, bulk, index);
+		let pre = prev;
 
 		for (let [k, v] of Object.entries(node.meshes)) {
-			var res = "";
-			let meshIndex = k;
-			let objName = `${nodePath}_${meshIndex}`;
-			var obj = writeOBJ(objName, node, node.meshes[meshIndex], exclude, pre);
+			let res = "";
+			const meshIndex = k;
+			const objName = `${nodePath}_${meshIndex}`;
+			const obj = writeOBJ(objName, node, node.meshes[meshIndex], exclude, pre);
 			res += obj.content;
 
-			let tex = node.meshes[meshIndex].texture;
-			let texName = `tex_${nodePath}_${meshIndex}`;
+			const tex = node.meshes[meshIndex].texture;
+			const texName = `tex_${nodePath}_${meshIndex}`;
 
 			fs.appendFileSync(`${dir}/model.obj`, `usemtl ${texName}\n`);
 			fs.appendFileSync(`${dir}/model.obj`, res);
@@ -115,19 +116,19 @@ async function run() {
 		return pre;
 	}
 
-	var prev = null
-
-	var keys = [];
+	const keys = [];
 	async function search(k, level = 999) {
 		if (k.length > level) return;
+		let nxt;
 		try {
-			var nxt = await possNext(k);
+			nxt = await possNext(k);
 			console.log("found: " + k)
 			keys.push(k);
 		} catch (ex) {
+			// ignore
 			return;
 		}
-		for (var i = 0; i < nxt.length; i++) {
+		for (let i = 0; i < nxt.length; i++) {
 			await search(k + "" + nxt[i], level);
 		}
 	}
@@ -138,15 +139,15 @@ async function run() {
 	keys.sort();
 	keys.reverse();
 
-	var excluders = {};
+	const excluders = {};
 
-	var prev = null;
+	let prev = null;
 
-	for (var k = null, i = 0; i < keys.length; i++) {
+	for (let k = null, i = 0; i < keys.length; i++) {
 		k = keys[i];
 
-		let idx = parseInt(k.substring(k.length - 1, k.length));
-		let parentKey = k.substring(0, k.length - 1);
+		const idx = parseInt(k.substring(k.length - 1, k.length));
+		const parentKey = k.substring(0, k.length - 1);
 
 		excluders[parentKey] = excluders[parentKey] || [];
 		excluders[parentKey].push(idx);
@@ -168,35 +169,35 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 			: false;
 	}
 
-	var str = "";
-	var indices = mesh.indices;
-	var vertices = mesh.vertices;
-	var normals = mesh.normals;
+	let str = "";
+	const indices = mesh.indices;
+	const vertices = mesh.vertices;
+	const normals = mesh.normals;
 
-	var _c_v = prev ? prev.c_v : 0;
-	var _c_n = prev ? prev.c_n : 0;
-	var _c_u = prev ? prev.c_u : 0;
+	const _c_v = prev ? prev.c_v : 0;
+	const _c_n = prev ? prev.c_n : 0;
+	const _c_u = prev ? prev.c_u : 0;
 
-	var c_v = _c_v;
-	var c_n = _c_n;
-	var c_u = _c_u;
+	let c_v = _c_v;
+	let c_n = _c_n;
+	let c_u = _c_u;
 
-	let console = { log: function (s) { str += s + "\n" } };
+	const console = { log: function (s) { str += s + "\n" } };
 
 	console.log(`o planet_${name}`);
 
 	console.log("# vertices");
-	for (var i = 0; i < vertices.length; i += 8) {
+	for (let i = 0; i < vertices.length; i += 8) {
 
-		var x = vertices[i + 0]
-		var y = vertices[i + 1]
-		var z = vertices[i + 2]
-		var w = 1;
+		let x = vertices[i + 0]
+		let y = vertices[i + 1]
+		let z = vertices[i + 2]
+		let w = 1;
 
-		var _x = 0;
-		var _y = 0;
-		var _z = 0;
-		var _w = 0;
+		let _x = 0;
+		let _y = 0;
+		let _z = 0;
+		let _w = 0;
 
 		const ma = payload.matrixGlobeFromMesh;
 		_x = x * ma[0] + y * ma[4] + z * ma[8] + w * ma[12];
@@ -216,19 +217,19 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 
 	if (mesh.uvOffsetAndScale) {
 		console.log("# UV");
-		for (var i = 0; i < vertices.length; i += 8) {
-			var u1 = vertices[i + 4];
-			var u2 = vertices[i + 5];
-			var v1 = vertices[i + 6];
-			var v2 = vertices[i + 7];
+		for (let i = 0; i < vertices.length; i += 8) {
+			const u1 = vertices[i + 4];
+			const u2 = vertices[i + 5];
+			const v1 = vertices[i + 6];
+			const v2 = vertices[i + 7];
 
-			var u = u2 * 256 + u1;
-			var v = v2 * 256 + v1;
+			const u = u2 * 256 + u1;
+			const v = v2 * 256 + v1;
 
-			var ut = (u + mesh.uvOffsetAndScale[0]) * mesh.uvOffsetAndScale[2];
-			var vt = (v + mesh.uvOffsetAndScale[1]) * mesh.uvOffsetAndScale[3];
+			const ut = (u + mesh.uvOffsetAndScale[0]) * mesh.uvOffsetAndScale[2];
+			const vt = (v + mesh.uvOffsetAndScale[1]) * mesh.uvOffsetAndScale[3];
 
-			var tex = mesh.texture;
+			const tex = mesh.texture;
 			if (tex.textureFormat == 6)
 				console.log(`vt ${ut} ${1 - vt}`)
 			else
@@ -238,16 +239,16 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 	}
 
 	console.log("# Normals");
-	for (var i = 0; i < normals.length; i += 4) {
-		var x = normals[i + 0] - 127;
-		var y = normals[i + 1] - 127;
-		var z = normals[i + 2] - 127;
-		var w = 0;
+	for (let i = 0; i < normals.length; i += 4) {
+		let x = normals[i + 0] - 127;
+		let y = normals[i + 1] - 127;
+		let z = normals[i + 2] - 127;
+		let w = 0;
 
-		var _x = 0;
-		var _y = 0;
-		var _z = 0;
-		var _w = 0;
+		let _x = 0;
+		let _y = 0;
+		let _z = 0;
+		let _w = 0;
 
 		const ma = payload.matrixGlobeFromMesh;
 		_x = x * ma[0] + y * ma[4] + z * ma[8] + w * ma[12];
@@ -265,37 +266,37 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 
 	console.log("# faces");
 
-	var triangle_groups = {};
-	for (var i = 0; i < indices.length - 2; i += 1) {
+	const triangle_groups = {};
+	for (let i = 0; i < indices.length - 2; i += 1) {
 		if (i === mesh.layerBounds[3]) break;
-		var a = indices[i + 0],
-			b = indices[i + 1],
-			c = indices[i + 2];
+		const a = indices[i + 0],
+		      b = indices[i + 1],
+		      c = indices[i + 2];
 		if (a == b || a == c || b == c) {
 			continue;
 		}
 
-		var n = a + 1
-		var o = b + 1
-		var p = c + 1
+		const n = a + 1
+		const o = b + 1
+		const p = c + 1
 
 		if (!(vertices[a * 8 + 3] === vertices[b * 8 + 3] && vertices[b * 8 + 3] === vertices[c * 8 + 3])) {
 			throw new Error("vertex w mismatch");
 		}
-		var w = vertices[a * 8 + 3];
+		const w = vertices[a * 8 + 3];
 
 		if (shouldExclude(w)) continue;
 		triangle_groups[w] = [].concat(triangle_groups[w] || [], [(i & 1) ? [a, c, b] : [a, b, c]]);
 	}
 
-	for (var k in triangle_groups) {
+	for (let k in triangle_groups) {
 		if (!triangle_groups.hasOwnProperty(k)) throw new Error("no k property");
-		var triangles = triangle_groups[k];
+		const triangles = triangle_groups[k];
 
-		for (var t in triangles) {
+		for (let t in triangles) {
 			if (!triangles.hasOwnProperty(t)) throw new Error("no t property");
-			var v = triangles[t];
-			var a = v[0] + 1, b = v[1] + 1, c = v[2] + 1;
+			const v = triangles[t];
+			const a = v[0] + 1, b = v[1] + 1, c = v[2] + 1;
 
 			if (mesh.uvOffsetAndScale) {
 				console.log(`f ${a + _c_v}/${a + _c_u}/${a + _c_n} ${b + _c_v}/${b + _c_u}/${b + _c_n} ${c + _c_v}/${c + _c_u}/${c + _c_n}`)
@@ -316,20 +317,21 @@ const CMD_NODE = 3;
 
 // get index by path
 function traverse(path, childIndices) {
-	for (var c = -1, e = path, f = (e.length - 1) - ((e.length - 1) % 4); f < e.length; ++f)
+	let c = -1;
+	for (let e = path, f = (e.length - 1) - ((e.length - 1) % 4); f < e.length; ++f)
 		c = childIndices[8 * (c + 1) + (e.charCodeAt(f) - 48)];
 	return c;
 }
 
 async function getNode(path, bulk, index) {
 
-	let nodeEpoch = bulk.epoch[index];
-	let nodeImgEpoch = bulk.imageryEpochArray ? bulk.imageryEpochArray[index] : bulk.defaultImageryEpoch;
-	let nodeTexFormat = bulk.textureFormatArray ? bulk.textureFormatArray[index] : bulk.defaultTextureFormat;
-	let nodeFlags = bulk.flags[index];
+	const nodeEpoch = bulk.epoch[index];
+	const nodeImgEpoch = bulk.imageryEpochArray ? bulk.imageryEpochArray[index] : bulk.defaultImageryEpoch;
+	const nodeTexFormat = bulk.textureFormatArray ? bulk.textureFormatArray[index] : bulk.defaultTextureFormat;
+	const nodeFlags = bulk.flags[index];
 
-	let imgEpochPart = nodeFlags & 16 ? `!3u${nodeImgEpoch}` : '';
-	let url = `!1m2!1s${path}!2u${nodeEpoch}!2e${nodeTexFormat}${imgEpochPart}!4b0`
+	const imgEpochPart = nodeFlags & 16 ? `!3u${nodeImgEpoch}` : '';
+	const url = `!1m2!1s${path}!2u${nodeEpoch}!2e${nodeTexFormat}${imgEpochPart}!4b0`
 
 	return await decode(CMD_NODE, `NodeData/pb=${url}`);
 }
@@ -352,9 +354,9 @@ async function decode(command, url) {
 		return cache[url];
 	}
 
-	let payload = await fetchAsync(`${URL_PREFIX}${url}`);
-	let data = await decodeResource(command, payload);
-	let res = data.payload;
+	const payload = await getUrl(`${URL_PREFIX}${url}`);
+	const data = await decodeResource(command, payload);
+	const res = data.payload;
 
 	if (CACHE_ENABLED) {
 		cache[url] = res;
@@ -367,18 +369,6 @@ async function decode(command, url) {
 	}
 
 	return res;
-}
-
-// https url fetcher
-function fetchAsync(url) {
-	return new Promise((resolve, reject) => {
-		let chunks = []
-		require("https").get(url, resp => resp
-			.on("data", d => chunks.push(d))
-			.on("end", () => resolve(Buffer.concat(chunks)))
-			.on("error", reject)
-		).on("error", reject)
-	})
 }
 
 /****************************************************************/
