@@ -3,37 +3,12 @@
 /**************************** config ****************************/
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
-let DL_DIR = './downloaded_files';
-const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [1/30, 89946, 141738, -130075]; // prevents jitter in 3d viewers
-/****************************************************************/
-
-/*************************** cmd line ***************************/
-function cmd() {
-	let errors = [];
-	let argv = process.argv.slice(2);
-	let optional = argv.slice(2);
-	let [octant, max_level] = argv;	
-	if ([octant, max_level].includes(undefined)) {
-		errors.push(null);
-	} else {
-		if (!/^[0-7]{2,32}$/.test(octant)) errors.push('Invalid octant.');
-		if (!/^\d{1,2}$/.test(max_level)) errors.push('Invalid max_level.');
-		if (optional.filter(o => !['--dump-json', '--dump-raw'].includes(o)).length > 0) errors.push('Invalid parameters.');
-	}
-	if (errors.length > 0) {
-		const invoc = `node ${require('path').basename(__filename)}`;
-		console.error(`Usage:`);
-		console.error(`  ${invoc} [octant] [max_level] [[--dump-json]] [[--dump-raw]]`);
-		console.error(`  ${invoc} 20527061605273514 20`);
-		errors.filter(e => e).forEach(e => console.error(`Error: ${e}`));
-		process.exit(1);
-	}
-	return [octant, parseInt(max_level), optional.includes('--dump-json'), optional.includes('--dump-raw')];
-}
-/****************************************************************/
-
-const [OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW] = cmd();
+const DL_DIR = './downloaded_files';
 const [DUMP_JSON_DIR, DUMP_RAW_DIR] = [DL_DIR + '/json', DL_DIR + '/raw'];
+const [OBJ_SCALE, OBJ_MOVE_X, OBJ_MOVE_Y, OBJ_MOVE_Z] = [1/30, 89946, 141738, -130075]; // prevents jitter in 3d viewers
+
+const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW} = require('./lib/parse-command-line')(process.argv.slice(2));
+/****************************************************************/
 
 let execSync = require('child_process').execSync;
 const fs = require('fs');
