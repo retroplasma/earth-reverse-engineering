@@ -9,16 +9,14 @@ const [DUMP_JSON_DIR, DUMP_RAW_DIR] = [DL_DIR + '/json', DL_DIR + '/raw'];
 const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW} = require('./lib/parse-command-line')(process.argv.slice(2));
 /****************************************************************/
 
-let execSync = require('child_process').execSync;
-const fs = require('fs');
+const fs = require('fs-extra');
 const decodeResource = require('./lib/decode-resource');
 const decodeTexture = require('./lib/decode-texture');
 const getUrl = require('./lib/get-url');
 
 if (DUMP_JSON || DUMP_RAW) {
-	DUMP_JSON && execSync(`mkdir -p ${DUMP_JSON_DIR}`);
-	DUMP_RAW && execSync(`mkdir -p ${DUMP_RAW_DIR}`);
-	execSync = () => {};
+	DUMP_JSON && fs.mkdirSync(DUMP_JSON_DIR);
+	DUMP_RAW && fs.mkdirSync(DUMP_RAW_DIR);
 	fs._appendFileSync = fs.appendFileSync;
 	fs._writeFileSync = fs.writeFileSync;
 	fs.appendFileSync = () => {};
@@ -33,8 +31,8 @@ async function run() {
 	const DIR = DL_DIR + `/obj/${OCTANT}-${MAX_LEVEL}-${rootEpoch}`;
 	const dir = DIR;
 
-	execSync(`rm -Rf ${dir}`);
-	execSync(`mkdir -p ${dir}`);
+	fs.removeSync(dir);
+	fs.mkdirpSync(dir);
 	fs.appendFileSync(`${dir}/model.obj`, `mtllib model.mtl\n`);
 
 	async function possNext(nodePath, forceAll = false) {
