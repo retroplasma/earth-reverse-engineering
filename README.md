@@ -6,17 +6,17 @@ Earth to OBJ file downloader
 ```
 # tested with node@8.15.0, npm@6.4.1
 npm install
-node index.js [octant] [max_level] [[--dump-json]] [[--dump-raw]]
+node dump_obj.js [octant] [max_level] [[--dump-json]] [[--dump-raw]]
 
 # dump textured obj (octant from example.jpg)
-node index.js 20527061605273514 20
+node dump_obj.js 20527061605273514 20
 
 # prevents 3d viewers like blender from jittering
 # produces scaled + moved model.2.obj from model.obj
 bash scale_move_obj.sh
 
 # dump json and raw data
-node index.js 20527061605273514 20 --dump-json --dump-raw
+node dump_obj.js 20527061605273514 20 --dump-json --dump-raw
 ```
 
 ![find octant](how_to_find_octant.jpg "open maps and dev tools, switch to satellite, fly to destination, search for NodeData, copy octant path from recent request")
