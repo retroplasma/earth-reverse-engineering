@@ -1,18 +1,19 @@
 "use strict"
 
+const fs = require('fs-extra');
+const path = require('path');
+const decodeResource = require('./lib/decode-resource');
+const decodeTexture = require('./lib/decode-texture');
+const getUrl = require('./lib/get-url');
+
 /**************************** config ****************************/
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DL_DIR = './downloaded_files';
-const [DUMP_OBJ_DIR, DUMP_JSON_DIR, DUMP_RAW_DIR] = [DL_DIR + '/obj', DL_DIR + '/json', DL_DIR + '/raw'];
+const [DUMP_OBJ_DIR, DUMP_JSON_DIR, DUMP_RAW_DIR] = ['obj', 'json', 'raw'].map(x => path.join(DL_DIR, x));
 const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW} = require('./lib/parse-command-line')(process.argv.slice(2));
 const DUMP_OBJ = !(DUMP_JSON || DUMP_RAW);
 /****************************************************************/
-
-const fs = require('fs-extra');
-const decodeResource = require('./lib/decode-resource');
-const decodeTexture = require('./lib/decode-texture');
-const getUrl = require('./lib/get-url');
 
 /***************************** main *****************************/
 async function run() {
@@ -23,11 +24,11 @@ async function run() {
 	const planetoid = await getPlanetoid();
 	const rootEpoch = planetoid.bulkMetadataEpoch[0];
 
-	const objDir = `${DUMP_OBJ_DIR}/${OCTANT}-${MAX_LEVEL}-${rootEpoch}`;
+	const objDir = path.join(DUMP_OBJ_DIR, `${OCTANT}-${MAX_LEVEL}-${rootEpoch}`);
 	if (DUMP_OBJ) {
 		fs.removeSync(objDir);
 		fs.ensureDirSync(objDir);
-		fs.appendFileSync(`${objDir}/model.obj`, `mtllib model.mtl\n`);
+		fs.appendFileSync(path.join(objDir, 'model.obj'), `mtllib model.mtl\n`);
 	}
 
 	async function possNext(nodePath, forceAll = false) {
@@ -85,12 +86,12 @@ async function run() {
 			const tex = node.meshes[meshIndex].texture;
 			const texName = `tex_${nodePath}_${meshIndex}`;
 
-			fs.appendFileSync(`${objDir}/model.obj`, `usemtl ${texName}\n`);
-			fs.appendFileSync(`${objDir}/model.obj`, res);
+			fs.appendFileSync(path.join(objDir, 'model.obj'), `usemtl ${texName}\n`);
+			fs.appendFileSync(path.join(objDir, 'model.obj'), res);
 
 			const {buffer: buf, extension: ext} = decodeTexture(tex);
 
-			fs.appendFileSync(`${objDir}/model.mtl`, `
+			fs.appendFileSync(path.join(objDir, 'model.mtl'), `
 				newmtl ${texName}
 				Ka 1.000000 1.000000 1.000000
 				Kd 1.000000 1.000000 1.000000
@@ -101,7 +102,7 @@ async function run() {
 				map_Kd ${texName}.${ext}
 			`.split('\n').map(s => s.trim()).join('\n'));
 
-			fs.appendFileSync(`${objDir}/${texName}.${ext}`, buf);
+			fs.appendFileSync(path.join(objDir, `${texName}.${ext}`), buf);
 
 			pre = obj;
 		}
@@ -270,10 +271,6 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 			continue;
 		}
 
-		const n = a + 1
-		const o = b + 1
-		const p = c + 1
-
 		if (!(vertices[a * 8 + 3] === vertices[b * 8 + 3] && vertices[b * 8 + 3] === vertices[c * 8 + 3])) {
 			throw new Error("vertex w mismatch");
 		}
@@ -357,8 +354,8 @@ async function decode(command, url) {
 	}
 
 	const fn = url.replace('/pb=', '');
-	DUMP_JSON && fs.writeFileSync(`${DUMP_JSON_DIR}/${fn}.json`, JSON.stringify(res, null, 2));
-	DUMP_RAW && fs.writeFileSync(`${DUMP_RAW_DIR}/${fn}.raw`, payload);
+	DUMP_JSON && fs.writeFileSync(path.join(DUMP_JSON_DIR, `${fn}.json`), JSON.stringify(res, null, 2));
+	DUMP_RAW && fs.writeFileSync(path.join(DUMP_RAW_DIR, `${fn}.raw`), payload);
 
 	return res;
 }
