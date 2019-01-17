@@ -90,7 +90,7 @@ async function run() {
 
 			const {buffer: buf, extension: ext} = decodeTexture(tex);
 
-			fs.appendFileSync(`${dir}/model.mtl`, `
+			fs.appendFileSync(`${objDir}/model.mtl`, `
 				newmtl ${texName}
 				Ka 1.000000 1.000000 1.000000
 				Kd 1.000000 1.000000 1.000000
@@ -129,7 +129,7 @@ async function run() {
 
 	console.log("octants: " + keys.length);
 
-	if (!DUMP_OBJ) {
+	if (DUMP_OBJ) {
 		keys.sort();
 		keys.reverse();
 
