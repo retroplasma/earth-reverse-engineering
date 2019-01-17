@@ -11,7 +11,7 @@ const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DL_DIR = './downloaded_files';
 const [DUMP_OBJ_DIR, DUMP_JSON_DIR, DUMP_RAW_DIR] = ['obj', 'json', 'raw'].map(x => path.join(DL_DIR, x));
-const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW} = require('./lib/parse-command-line')(process.argv.slice(2));
+const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW, PARALLEL_SEARCH} = require('./lib/parse-command-line')(process.argv.slice(2));
 const DUMP_OBJ = !(DUMP_JSON || DUMP_RAW);
 /****************************************************************/
 
@@ -42,7 +42,7 @@ async function run() {
 			index = traverse(subPath, bulk.childIndices);
 			epoch = bulk.bulkMetadataEpoch[index];
 		}
-		if (index < 0) throw new Error('Node not available');
+		if (index < 0) return null; //throw new Error('Node not available');
 		const node = await getNode(nodePath, bulk, index);
 
 		if (forceAll) return [0, 1, 2, 3, 4, 5, 6, 7]
@@ -56,7 +56,7 @@ async function run() {
 		})
 		const keys = Object.keys(dict).map(k => parseInt(k));
 		if (keys.filter(k => k >= 0 && k <= 7).length != keys.length) {
-			throw new Error("invalid w: " + keys);
+			return null; //throw new Error("invalid w: " + keys);
 		}
 		return keys;
 	}
@@ -117,17 +117,23 @@ async function run() {
 			nxt = await possNext(k);
 			console.log("found: " + k)
 			keys.push(k);
-		} catch (ex) {
-			// ignore
+		} catch (ex) {			
+			console.error(ex)
 			return;
 		}
 
-		const promises = [];
-		for (let i = 0; i < nxt.length; i++) {
-			const x = search(k + "" + nxt[i], level);
-			promises.push(x);
+		if (PARALLEL_SEARCH) {
+			const promises = [];
+			for (let i = 0; i < nxt.length; i++) {
+				const x = search(k + "" + nxt[i], level);
+				promises.push(x);
+			}
+			await Promise.all(promises);
+		} else {
+			for (let i = 0; i < nxt.length; i++) {
+				await search(k + "" + nxt[i], level);
+			}
 		}
-		await Promise.all(promises);
 	}
 
 	await search(OCTANT, MAX_LEVEL);
