@@ -114,6 +114,8 @@ async function run() {
 		let nxt;
 		try {
 			nxt = await possNext(k);
+			if (nxt === null) return;
+			
 			console.log("found: " + k)
 			keys.push(k);
 		} catch (ex) {			
