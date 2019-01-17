@@ -4,9 +4,9 @@
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DL_DIR = './downloaded_files';
-const [DUMP_JSON_DIR, DUMP_RAW_DIR] = [DL_DIR + '/json', DL_DIR + '/raw'];
-
+const [DUMP_OBJ_DIR, DUMP_JSON_DIR, DUMP_RAW_DIR] = [DL_DIR + '/obj', DL_DIR + '/json', DL_DIR + '/raw'];
 const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW} = require('./lib/parse-command-line')(process.argv.slice(2));
+const DUMP_OBJ = !(DUMP_JSON || DUMP_RAW);
 /****************************************************************/
 
 const fs = require('fs-extra');
@@ -14,26 +14,21 @@ const decodeResource = require('./lib/decode-resource');
 const decodeTexture = require('./lib/decode-texture');
 const getUrl = require('./lib/get-url');
 
-if (DUMP_JSON || DUMP_RAW) {
-	DUMP_JSON && fs.ensureDirSync(DUMP_JSON_DIR);
-	DUMP_RAW && fs.ensureDirSync(DUMP_RAW_DIR);
-	fs._appendFileSync = fs.appendFileSync;
-	fs._writeFileSync = fs.writeFileSync;
-	fs.appendFileSync = () => {};
-	fs.writeFileSync = () => {};
-}
-
 /***************************** main *****************************/
 async function run() {
 
+	DUMP_JSON && fs.ensureDirSync(DUMP_JSON_DIR);
+	DUMP_RAW && fs.ensureDirSync(DUMP_RAW_DIR);
+
 	const planetoid = await getPlanetoid();
 	const rootEpoch = planetoid.bulkMetadataEpoch[0];
-	const DIR = DL_DIR + `/obj/${OCTANT}-${MAX_LEVEL}-${rootEpoch}`;
-	const dir = DIR;
 
-	fs.removeSync(dir);
-	fs.ensureDirSync(dir);
-	fs.appendFileSync(`${dir}/model.obj`, `mtllib model.mtl\n`);
+	const objDir = `${DUMP_OBJ_DIR}/${OCTANT}-${MAX_LEVEL}-${rootEpoch}`;
+	if (DUMP_OBJ) {
+		fs.removeSync(objDir);
+		fs.ensureDirSync(objDir);
+		fs.appendFileSync(`${objDir}/model.obj`, `mtllib model.mtl\n`);
+	}
 
 	async function possNext(nodePath, forceAll = false) {
 		let bulk = null, index = -1;
@@ -90,8 +85,8 @@ async function run() {
 			const tex = node.meshes[meshIndex].texture;
 			const texName = `tex_${nodePath}_${meshIndex}`;
 
-			fs.appendFileSync(`${dir}/model.obj`, `usemtl ${texName}\n`);
-			fs.appendFileSync(`${dir}/model.obj`, res);
+			fs.appendFileSync(`${objDir}/model.obj`, `usemtl ${texName}\n`);
+			fs.appendFileSync(`${objDir}/model.obj`, res);
 
 			const {buffer: buf, extension: ext} = decodeTexture(tex);
 
@@ -106,7 +101,7 @@ async function run() {
 				map_Kd ${texName}.${ext}
 			`.split('\n').map(s => s.trim()).join('\n'));
 
-			fs.appendFileSync(`${dir}/${texName}.${ext}`, buf);
+			fs.appendFileSync(`${objDir}/${texName}.${ext}`, buf);
 
 			pre = obj;
 		}
@@ -133,23 +128,26 @@ async function run() {
 	await search(OCTANT, MAX_LEVEL);
 
 	console.log("octants: " + keys.length);
-	keys.sort();
-	keys.reverse();
 
-	const excluders = {};
+	if (!DUMP_OBJ) {
+		keys.sort();
+		keys.reverse();
 
-	let prev = null;
+		const excluders = {};
 
-	for (let k = null, i = 0; i < keys.length; i++) {
-		k = keys[i];
+		let prev = null;
 
-		const idx = parseInt(k.substring(k.length - 1, k.length));
-		const parentKey = k.substring(0, k.length - 1);
+		for (let k = null, i = 0; i < keys.length; i++) {
+			k = keys[i];
 
-		excluders[parentKey] = excluders[parentKey] || [];
-		excluders[parentKey].push(idx);
+			const idx = parseInt(k.substring(k.length - 1, k.length));
+			const parentKey = k.substring(0, k.length - 1);
 
-		prev = await extract(k, prev, excluders[k] || []);
+			excluders[parentKey] = excluders[parentKey] || [];
+			excluders[parentKey].push(idx);
+
+			prev = await extract(k, prev, excluders[k] || []);
+		}
 	}
 }
 /****************************************************************/
@@ -358,11 +356,9 @@ async function decode(command, url) {
 		cache[url] = res;
 	}
 
-	if (DUMP_JSON || DUMP_RAW) {
-		const fn = url.replace('/pb=', '');
-		DUMP_JSON && fs._writeFileSync(`${DUMP_JSON_DIR}/${fn}.json`, JSON.stringify(res, null, 2));
-		DUMP_RAW && fs._writeFileSync(`${DUMP_RAW_DIR}/${fn}.raw`, payload);
-	}
+	const fn = url.replace('/pb=', '');
+	DUMP_JSON && fs.writeFileSync(`${DUMP_JSON_DIR}/${fn}.json`, JSON.stringify(res, null, 2));
+	DUMP_RAW && fs.writeFileSync(`${DUMP_RAW_DIR}/${fn}.raw`, payload);
 
 	return res;
 }
