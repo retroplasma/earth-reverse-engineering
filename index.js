@@ -15,8 +15,8 @@ const decodeTexture = require('./lib/decode-texture');
 const getUrl = require('./lib/get-url');
 
 if (DUMP_JSON || DUMP_RAW) {
-	DUMP_JSON && fs.mkdirSync(DUMP_JSON_DIR);
-	DUMP_RAW && fs.mkdirSync(DUMP_RAW_DIR);
+	DUMP_JSON && fs.ensureDirSync(DUMP_JSON_DIR);
+	DUMP_RAW && fs.ensureDirSync(DUMP_RAW_DIR);
 	fs._appendFileSync = fs.appendFileSync;
 	fs._writeFileSync = fs.writeFileSync;
 	fs.appendFileSync = () => {};
@@ -32,7 +32,7 @@ async function run() {
 	const dir = DIR;
 
 	fs.removeSync(dir);
-	fs.mkdirpSync(dir);
+	fs.ensureDirSync(dir);
 	fs.appendFileSync(`${dir}/model.obj`, `mtllib model.mtl\n`);
 
 	async function possNext(nodePath, forceAll = false) {
