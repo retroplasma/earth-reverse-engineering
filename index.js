@@ -121,9 +121,13 @@ async function run() {
 			// ignore
 			return;
 		}
+
+		const promises = [];
 		for (let i = 0; i < nxt.length; i++) {
-			await search(k + "" + nxt[i], level);
+			const x = search(k + "" + nxt[i], level);
+			promises.push(x);
 		}
+		await Promise.all(promises);
 	}
 
 	await search(OCTANT, MAX_LEVEL);
@@ -338,24 +342,44 @@ async function getBulk(path, epoch) {
 const CACHE_ENABLED = true;
 const cache = {};
 
+const requests = {}
+
 // download and decode map data
 async function decode(command, url) {
 	
 	if (CACHE_ENABLED && cache[url]) {
 		return cache[url];
+	}	
+	
+	if (requests[url]) {
+		// deduplicate parallel downloads
+		return await new Promise(function (resolve, reject) {
+			requests[url].push({ resolve, reject });
+		});
+	};
+
+	requests[url] = [];
+
+	let res;
+	try {
+		const payload = await getUrl(`${URL_PREFIX}${url}`);
+		const data = await decodeResource(command, payload);
+		res = data.payload;
+
+		if (CACHE_ENABLED) {
+			cache[url] = res;
+		}
+
+		const fn = url.replace('/pb=', '');
+		DUMP_JSON && fs.writeFileSync(path.join(DUMP_JSON_DIR, `${fn}.json`), JSON.stringify(res, null, 2));
+		DUMP_RAW && fs.writeFileSync(path.join(DUMP_RAW_DIR, `${fn}.raw`), payload);		
+	} catch (ex) {
+		requests[url].forEach(p => p.reject(ex));
+		throw ex;
 	}
 
-	const payload = await getUrl(`${URL_PREFIX}${url}`);
-	const data = await decodeResource(command, payload);
-	const res = data.payload;
-
-	if (CACHE_ENABLED) {
-		cache[url] = res;
-	}
-
-	const fn = url.replace('/pb=', '');
-	DUMP_JSON && fs.writeFileSync(path.join(DUMP_JSON_DIR, `${fn}.json`), JSON.stringify(res, null, 2));
-	DUMP_RAW && fs.writeFileSync(path.join(DUMP_RAW_DIR, `${fn}.raw`), payload);
+	requests[url].forEach(p => p.resolve(res));
+	delete requests[url];
 
 	return res;
 }
