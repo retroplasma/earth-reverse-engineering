@@ -6,7 +6,7 @@ Earth to OBJ file downloader
 ```
 # tested with node@8.15.0, npm@6.4.1
 npm install
-node dump_obj.js [octant] [max_level] [[--dump-json]] [[--dump-raw]]
+node dump_obj.js [octant] [max_level] [[--dump-json]] [[--dump-raw]] [[--parallel-search]]
 
 # dump textured obj (octant from example.jpg)
 node dump_obj.js 20527061605273514 20

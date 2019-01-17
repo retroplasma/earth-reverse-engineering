@@ -9,7 +9,7 @@ const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DL_DIR = './downloaded_files';
 const [DUMP_OBJ_DIR, DUMP_JSON_DIR, DUMP_RAW_DIR] = ['obj', 'json', 'raw'].map(x => path.join(DL_DIR, x));
-const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW, PARALLEL_SEARCH} = require('./lib/parse-command-line')(process.argv.slice(2));
+const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW, PARALLEL_SEARCH} = require('./lib/parse-command-line')(__filename);
 const DUMP_OBJ = !(DUMP_JSON || DUMP_RAW);
 /****************************************************************/
 
