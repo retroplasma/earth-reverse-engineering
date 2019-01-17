@@ -18,6 +18,7 @@
   "homepage": "https://github.com/retroplasma/earth-reverse-engineering#readme",
   "dependencies": {
     "bmp-js": "^0.1.0",
-    "decode-dxt": "^1.0.1"
+    "decode-dxt": "^1.0.1",
+    "fs-extra": "^7.0.1"
   }
 }
