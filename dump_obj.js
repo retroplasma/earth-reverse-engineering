@@ -30,21 +30,22 @@ async function run() {
 		fs.appendFileSync(path.join(objDir, 'model.obj'), `mtllib model.mtl\n`);
 	}
 
-	async function possNext(nodePath, forceAll = false) {		
+	async function guessNextOctants(nodePath, forceAll = false) {		
 		const node = await getNodeFromNodePath(nodePath);
 		if (node === null) return null;
 
 		if (forceAll) return [0, 1, 2, 3, 4, 5, 6, 7]
 
-		// hax
+		// use mesh octant mask to guess next nodes
 		const dict = {}
 		node.meshes.forEach(mesh => {
 			for (let i = 0; i < mesh.vertices.length; i += 8) {
 				dict[mesh.vertices[i + 3]] = true
 			}
 		})
+		
 		const keys = Object.keys(dict).map(k => parseInt(k));
-		if (keys.filter(k => k >= 0 && k <= 7).length != keys.length) {
+		if (keys.filter(k => 0 <= k && k <= 7).length != keys.length) {
 			// invalid w
 			return null;
 		}
@@ -73,7 +74,7 @@ async function run() {
 		if (k.length > level) return;
 		let nxt;
 		try {
-			nxt = await possNext(k);
+			nxt = await guessNextOctants(k);
 			if (nxt === null) return;
 			
 			console.log("found: " + k)
