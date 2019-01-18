@@ -30,19 +30,9 @@ async function run() {
 		fs.appendFileSync(path.join(objDir, 'model.obj'), `mtllib model.mtl\n`);
 	}
 
-	async function possNext(nodePath, forceAll = false) {
-		let bulk = null, index = -1;
-		for (let epoch = rootEpoch, i = 4; i < nodePath.length + 4; i += 4) {
-			const bulkPath = nodePath.substring(0, i - 4);
-			const subPath = nodePath.substring(0, i);
-
-			const nextBulk = await getBulk(bulkPath, epoch);
-			bulk = nextBulk;
-			index = traverse(subPath, bulk.childIndices);
-			epoch = bulk.bulkMetadataEpoch[index];
-		}
-		if (index < 0) return null; //throw new Error('Node not available');
-		const node = await getNode(nodePath, bulk, index);
+	async function possNext(nodePath, forceAll = false) {		
+		const node = await getNodeFromNodePath(nodePath);
+		if (node === null) return null;
 
 		if (forceAll) return [0, 1, 2, 3, 4, 5, 6, 7]
 
@@ -55,12 +45,13 @@ async function run() {
 		})
 		const keys = Object.keys(dict).map(k => parseInt(k));
 		if (keys.filter(k => k >= 0 && k <= 7).length != keys.length) {
-			return null; //throw new Error("invalid w: " + keys);
+			// invalid w
+			return null;
 		}
 		return keys;
 	}
 
-	async function extract(nodePath, prev, exclude) {
+	async function getNodeFromNodePath(nodePath) {
 		let bulk = null, index = -1;
 		for (let epoch = rootEpoch, i = 4; i < nodePath.length + 4; i += 4) {
 			const bulkPath = nodePath.substring(0, i - 4);
@@ -71,41 +62,10 @@ async function run() {
 			index = traverse(subPath, bulk.childIndices);
 			epoch = bulk.bulkMetadataEpoch[index];
 		}
-		if (index < 0) throw new Error('Node not available');
+		if (index < 0) return null;
 		const node = await getNode(nodePath, bulk, index);
-		let pre = prev;
-
-		for (let [k, v] of Object.entries(node.meshes)) {
-			let res = "";
-			const meshIndex = k;
-			const objName = `${nodePath}_${meshIndex}`;
-			const obj = writeOBJ(objName, node, node.meshes[meshIndex], exclude, pre);
-			res += obj.content;
-
-			const tex = node.meshes[meshIndex].texture;
-			const texName = `tex_${nodePath}_${meshIndex}`;
-
-			fs.appendFileSync(path.join(objDir, 'model.obj'), `usemtl ${texName}\n`);
-			fs.appendFileSync(path.join(objDir, 'model.obj'), res);
-
-			const {buffer: buf, extension: ext} = decodeTexture(tex);
-
-			fs.appendFileSync(path.join(objDir, 'model.mtl'), `
-				newmtl ${texName}
-				Ka 1.000000 1.000000 1.000000
-				Kd 1.000000 1.000000 1.000000
-				Ks 0.000000 0.000000 0.000000
-				Tr 1.000000
-				illum 1
-				Ns 0.000000
-				map_Kd ${texName}.${ext}
-			`.split('\n').map(s => s.trim()).join('\n'));
-
-			fs.appendFileSync(path.join(objDir, `${texName}.${ext}`), buf);
-
-			pre = obj;
-		}
-		return pre;
+		
+		return node;
 	}
 
 	const keys = [];
@@ -146,8 +106,7 @@ async function run() {
 		keys.reverse();
 
 		const excluders = {};
-
-		let prev = null;
+		const objCtx = initCtxOBJ(objDir);
 
 		for (let k = null, i = 0; i < keys.length; i++) {
 			k = keys[i];
@@ -158,7 +117,8 @@ async function run() {
 			excluders[parentKey] = excluders[parentKey] || [];
 			excluders[parentKey].push(idx);
 
-			prev = await extract(k, prev, excluders[k] || []);
+			const node = await getNodeFromNodePath(k);
+			writeNodeOBJ(objCtx, node, k, excluders[k] || []);
 		}
 	}
 }
@@ -167,8 +127,39 @@ async function run() {
 
 
 /**************************** helper ****************************/
+function initCtxOBJ(dir) {
+	return { objDir: dir, c_v: 0, c_n: 0, c_u: 0 };
+}
 
-function writeOBJ(name, payload, mesh, exclude, prev) {
+function writeNodeOBJ(ctx, node, nodeName, exclude) {
+	for (const [meshIndex, mesh] of Object.entries(node.meshes)) {
+		const objName = `${nodeName}_${meshIndex}`;		
+		const tex = mesh.texture;
+		const texName = `tex_${nodeName}_${meshIndex}`;
+		
+		const res = writeMeshOBJ(ctx, objName, node, mesh, exclude);
+
+		fs.appendFileSync(path.join(ctx.objDir, 'model.obj'), `usemtl ${texName}\n`);
+		fs.appendFileSync(path.join(ctx.objDir, 'model.obj'), res);
+
+		const {buffer: buf, extension: ext} = decodeTexture(tex);
+
+		fs.appendFileSync(path.join(ctx.objDir, 'model.mtl'), `
+			newmtl ${texName}
+			Ka 1.000000 1.000000 1.000000
+			Kd 1.000000 1.000000 1.000000
+			Ks 0.000000 0.000000 0.000000
+			Tr 1.000000
+			illum 1
+			Ns 0.000000
+			map_Kd ${texName}.${ext}
+		`.split('\n').map(s => s.trim()).join('\n'));
+
+		fs.appendFileSync(path.join(ctx.objDir, `${texName}.${ext}`), buf);
+	}
+}
+
+function writeMeshOBJ(ctx, name, payload, mesh, exclude) {
 
 	function shouldExclude(w) {
 		return (exclude instanceof Array)
@@ -181,9 +172,9 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 	const vertices = mesh.vertices;
 	const normals = mesh.normals;
 
-	const _c_v = prev ? prev.c_v : 0;
-	const _c_n = prev ? prev.c_n : 0;
-	const _c_u = prev ? prev.c_u : 0;
+	const _c_v = ctx.c_v;
+	const _c_n = ctx.c_n;
+	const _c_u = ctx.c_u;
 
 	let c_v = _c_v;
 	let c_n = _c_n;
@@ -309,7 +300,11 @@ function writeOBJ(name, payload, mesh, exclude, prev) {
 		}
 	}
 
-	return { content: str, c_v, c_u, c_n };
+	ctx.c_v = c_v;
+	ctx.c_u = c_u;
+	ctx.c_n = c_n;
+
+	return str;
 }
 
 /****************************************************************/
