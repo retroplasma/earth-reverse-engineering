@@ -22,6 +22,15 @@ async function run() {
 		process.exit(1);
 	}
 
+	if (!(-90 <= lat && lat <= 90)) {
+		console.error(`Invalid latitude: ${lat}`);
+		process.exit(1);
+	}
+	if (!(-180 <= lon && lon <= 180)) {
+		console.error(`Invalid longitude: ${lon}`);
+		process.exit(1);
+	}
+
 	console.log(lat + ', ' + lon)
 	console.log('-------------')
 
