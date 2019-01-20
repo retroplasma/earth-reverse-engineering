@@ -19,7 +19,6 @@
   "dependencies": {
     "bmp-js": "^0.1.0",
     "decode-dxt": "^1.0.1",
-    "ecef-projector": "^1.0.1",
     "fs-extra": "^7.0.1"
   }
 }
