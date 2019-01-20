@@ -13,7 +13,7 @@ node dump_obj.js 20527061605273514 20
 
 # prevents 3d viewers like blender from jittering
 # produces scaled + moved model.2.obj from model.obj
-bash scale_move_obj.sh
+node scale_move_obj.js
 
 # dump json and raw data
 node dump_obj.js 20527061605273514 20 --dump-json --dump-raw
