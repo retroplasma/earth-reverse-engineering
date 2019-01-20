@@ -3,11 +3,32 @@
 /**************************** config ****************************/
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
+const MAX_LEVEL = 20;
 /****************************************************************/
 
 const { getPlanetoid, getBulk, getNode, traverse } = require('./lib/utils')({
 	URL_PREFIX, DUMP_JSON_DIR: null, DUMP_RAW_DIR: null, DUMP_JSON: false, DUMP_RAW: false
 });
+
+
+function getFirstOctant(lat, lon) {
+	if (lat < 0) {
+		if (lon < -90) return ['02', { n: 0, s: -90, w: -180, e: -90 }];
+		if (lon <   0) return ['03', { n: 0, s: -90, w: -90, e: 0 }];
+		if (lon <  90) return ['12', { n: 0, s: -90, w: 0, e: 90 }];
+		               return ['13', { n: 0, s: -90, w: 90, e: 180 }];
+	}
+	if (lat >= 0) {
+		if (lon < -90) return ['20', { n: 90, s: 0, w: -180, e: -90 }];
+		if (lon <   0) return ['21', { n: 90, s: 0, w: -90, e: 0 }];
+		if (lon <  90) return ['30', { n: 90, s: 0, w: 0, e: 90 }];
+		               return ['31', { n: 90, s: 0, w: 90, e: 180 }];
+	}
+
+	console.error(`Invalid latitude and longitude`);
+	process.exit(1);
+}
+
 
 /***************************** main *****************************/
 async function run() {
@@ -54,7 +75,7 @@ async function run() {
 		return node;
 	}
 
-	async function search(nodePath, maxLevel=25) {
+	async function search(nodePath, maxLevel) {
 		if (nodePath.length > maxLevel) return;
 		try {
 			const node = await getNodeFromNodePath(nodePath);
@@ -72,7 +93,8 @@ async function run() {
 		}
 	}
 
-	await search("02", 4);
+	let [nodePath, latlonbox] = getFirstOctant(lat, lon)
+	await search(nodePath, MAX_LEVEL);
 }
 
 /****************************************************************/
