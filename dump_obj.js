@@ -26,8 +26,7 @@ async function run() {
 	const objDir = path.join(DUMP_OBJ_DIR, `${OCTANT}-${MAX_LEVEL}-${rootEpoch}`);
 	if (DUMP_OBJ) {
 		fs.removeSync(objDir);
-		fs.ensureDirSync(objDir);
-		fs.appendFileSync(path.join(objDir, 'model.obj'), `mtllib model.mtl\n`);
+		fs.ensureDirSync(objDir);		
 	}
 
 	async function guessNextOctants(nodePath, forceAll = false) {		
@@ -129,22 +128,21 @@ async function run() {
 
 /**************************** helper ****************************/
 function initCtxOBJ(dir) {
+	fs.writeFileSync(path.join(dir, 'model.obj'), `mtllib model.mtl\n`);
 	return { objDir: dir, c_v: 0, c_n: 0, c_u: 0 };
 }
 
 function writeNodeOBJ(ctx, node, nodeName, exclude) {
 	for (const [meshIndex, mesh] of Object.entries(node.meshes)) {
-		const objName = `${nodeName}_${meshIndex}`;		
+		const meshName = `${nodeName}_${meshIndex}`;		
 		const tex = mesh.texture;
 		const texName = `tex_${nodeName}_${meshIndex}`;
-		
-		const res = writeMeshOBJ(ctx, objName, node, mesh, exclude);
 
-		fs.appendFileSync(path.join(ctx.objDir, 'model.obj'), `usemtl ${texName}\n`);
-		fs.appendFileSync(path.join(ctx.objDir, 'model.obj'), res);
+		const obj = writeMeshOBJ(ctx, meshName, texName, node, mesh, exclude);
+		fs.appendFileSync(path.join(ctx.objDir, 'model.obj'), obj);		
+
 
 		const {buffer: buf, extension: ext} = decodeTexture(tex);
-
 		fs.appendFileSync(path.join(ctx.objDir, 'model.mtl'), `
 			newmtl ${texName}
 			Ka 1.000000 1.000000 1.000000
@@ -156,11 +154,11 @@ function writeNodeOBJ(ctx, node, nodeName, exclude) {
 			map_Kd ${texName}.${ext}
 		`.split('\n').map(s => s.trim()).join('\n'));
 
-		fs.appendFileSync(path.join(ctx.objDir, `${texName}.${ext}`), buf);
+		fs.writeFileSync(path.join(ctx.objDir, `${texName}.${ext}`), buf);
 	}
 }
 
-function writeMeshOBJ(ctx, name, payload, mesh, exclude) {
+function writeMeshOBJ(ctx, meshName, texName, payload, mesh, exclude) {
 
 	function shouldExclude(w) {
 		return (exclude instanceof Array)
@@ -183,7 +181,8 @@ function writeMeshOBJ(ctx, name, payload, mesh, exclude) {
 
 	const console = { log: function (s) { str += s + "\n" } };
 
-	console.log(`o planet_${name}`);
+	console.log(`usemtl ${texName}`);
+	console.log(`o planet_${meshName}`);
 
 	console.log("# vertices");
 	for (let i = 0; i < vertices.length; i += 8) {
