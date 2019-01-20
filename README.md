@@ -3,10 +3,16 @@
 ![example](example.jpg "example")
 
 Earth to OBJ file downloader
-```
-# tested with node@8.15.0, npm@6.4.1
+```sh
+# install dependencies (tested with node@8.15.0, npm@6.4.1)
 npm install
+
+# usage
 node dump_obj.js [octant] [max_level] [[--dump-json]] [[--dump-raw]] [[--parallel-search]]
+node lat_long_to_octant.js [latitude] [longitude]
+
+# find octant of latitude and longitude
+node lat_long_to_octant.js 37.420806884765625 -122.08419799804688
 
 # dump textured obj (octant from example.jpg)
 node dump_obj.js 20527061605273514 20
