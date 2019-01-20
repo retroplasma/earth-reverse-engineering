@@ -29,6 +29,36 @@ function getFirstOctant(lat, lon) {
 	process.exit(1);
 }
 
+function getNextOctant(box, lat, lon) {
+	let { n, s, w, e } = box;
+	const mid_lat = (n + s) / 2;
+	const mid_lon = (w + e) / 2;
+
+	let key = 0;
+
+	if (lat < mid_lat) {
+		// y = 0
+		n = mid_lat;
+	} else {
+		// y = 1
+		s = mid_lat;
+		key += 2;
+	}
+
+	if (n === 90 || s === -90) {
+		// x = 0
+	} else if (lon < mid_lon) {
+		// x = 0
+		e = mid_lon;
+	} else {
+		// x = 1
+		w = mid_lon;
+		key += 1;
+	}
+
+	return [key, { n, s, w, e }];
+}
+
 
 /***************************** main *****************************/
 async function run() {
@@ -75,18 +105,18 @@ async function run() {
 		return node;
 	}
 
-	async function search(nodePath, maxLevel) {
+	async function search(nodePath, box, maxLevel) {
 		if (nodePath.length > maxLevel) return;
 		try {
 			const node = await getNodeFromNodePath(nodePath);
 			if (node === null) return;
 
-			console.log("found: " + nodePath)
+			console.log(nodePath, box)
 
-			for (let i = 0; i < 8; i++) {
-				await search(nodePath + "" + i, maxLevel);
-			}
+			const [next_key, next_box] = getNextOctant(box, lat, lon)
 
+			await search(nodePath + "" + next_key, next_box, maxLevel);
+			await search(nodePath + "" + (next_key+4), next_box, maxLevel);
 		} catch (ex) {
 			console.error(ex)
 			return;
@@ -94,7 +124,7 @@ async function run() {
 	}
 
 	let [nodePath, latlonbox] = getFirstOctant(lat, lon)
-	await search(nodePath, MAX_LEVEL);
+	await search(nodePath, latlonbox, MAX_LEVEL);
 }
 
 /****************************************************************/
