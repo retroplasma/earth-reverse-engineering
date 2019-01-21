@@ -117,6 +117,10 @@ async function run() {
 			excluders[parentKey] = excluders[parentKey] || [];
 			excluders[parentKey].push(idx);
 
+			if ((excluders[k] || []).length === 8) {
+				continue;
+			}
+
 			const node = await getNodeFromNodePath(k);
 			writeNodeOBJ(objCtx, node, k, excluders[k] || []);
 		}
