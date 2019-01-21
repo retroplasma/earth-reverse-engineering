@@ -3,7 +3,7 @@
 /**************************** config ****************************/
 const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
-const MAX_LEVEL = 20;
+const MAX_LEVEL = 18;
 /****************************************************************/
 
 const utils = require('./lib/utils')({
