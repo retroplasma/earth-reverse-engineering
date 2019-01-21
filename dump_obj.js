@@ -13,7 +13,7 @@ const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW, PARALLEL_SEARCH} = require('./lib
 const DUMP_OBJ = !(DUMP_JSON || DUMP_RAW);
 /****************************************************************/
 
-const {getPlanetoid, getBulk, getNode, traverse} = require('./lib/utils')({
+const {getPlanetoid, getBulk, getNode, bulk: { traverse } } = require('./lib/utils')({
 	URL_PREFIX, DUMP_JSON_DIR, DUMP_RAW_DIR, DUMP_JSON, DUMP_RAW
 });
 
