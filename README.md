@@ -15,7 +15,7 @@ npm install
 # Find octant of latitude and longitude
 node lat_long_to_octant.js 37.420806884765625 -122.08419799804688
 
-# Dump textured obj (octant from example.jpg)
+# Dump textured obj (octant from example.jpg) to ./downloaded_files/obj directory
 node dump_obj.js 20527061605273514 20
 ```
 How to open with Blender: [BLENDER.md](BLENDER.md)
