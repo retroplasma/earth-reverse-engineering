@@ -1,6 +1,6 @@
 [![Gitter Chat](https://badges.gitter.im/earth-reverse-engineering/lobby.svg)](https://gitter.im/earth-reverse-engineering/lobby)
 
-![header](header.png "header")
+![header](header.png "Header image: 37.793647, -122.398938")
 
 #### Earth to OBJ file downloader
 We can dump a textured 3D model (*.obj with *.bmp and *.jpg) using these scripts. They require [Node.js](https://nodejs.org/en/) v8 with [npm](https://www.npmjs.com/):
@@ -8,22 +8,17 @@ We can dump a textured 3D model (*.obj with *.bmp and *.jpg) using these scripts
 # Install dependencies (tested with node@8.15.0, npm@6.4.1)
 npm install
 
-# Usage:
-# node dump_obj.js [octant] [max_level] [[--dump-json]] [[--dump-raw]] [[--parallel-search]]
-# node lat_long_to_octant.js [latitude] [longitude]
-
 # Find octant of latitude and longitude
 node lat_long_to_octant.js 37.420806884765625 -122.08419799804688
 
-# Dump textured obj (octant from example.jpg) to ./downloaded_files/obj directory
+# Dump octant with max-level 20
 node dump_obj.js 20527061605273514 20
 ```
-How to open with Blender: [BLENDER.md](BLENDER.md)
-
-Alternative method for finding octant:
-![find octant](how_to_find_octant.jpg "open maps and dev tools, switch to satellite, fly to destination, search for NodeData, copy octant path from recent request")
+Exported files will be in `./downloaded_files/obj`. They can be opened in Blender [like this](BLENDER.md).
 
 #### Notes for developers:
+
+Alternative method for finding octant: [Open maps and dev tools, switch to satellite, fly to destination, search for NodeData, copy octant path from recent request](how_to_find_octant.jpg)
 
 You can use this to dump json and raw data instead of obj:
 ```
