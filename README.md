@@ -9,8 +9,8 @@ We can dump a textured 3D model (*.obj with *.bmp and *.jpg) using these scripts
 npm install
 
 # usage
-node dump_obj.js [octant] [max_level] [[--dump-json]] [[--dump-raw]] [[--parallel-search]]
-node lat_long_to_octant.js [latitude] [longitude]
+# node dump_obj.js [octant] [max_level] [[--dump-json]] [[--dump-raw]] [[--parallel-search]]
+# node lat_long_to_octant.js [latitude] [longitude]
 
 # find octant of latitude and longitude
 node lat_long_to_octant.js 37.420806884765625 -122.08419799804688
