@@ -16,16 +16,20 @@ node lat_long_to_octant.js 37.420806884765625 -122.08419799804688
 
 # dump textured obj (octant from example.jpg)
 node dump_obj.js 20527061605273514 20
-
-# dump json and raw data
-node dump_obj.js 20527061605273514 20 --dump-json --dump-raw
 ```
 How to open with Blender: [BLENDER.md](BLENDER.md)
 
 Alternative method for finding octant:
 ![find octant](how_to_find_octant.jpg "open maps and dev tools, switch to satellite, fly to destination, search for NodeData, copy octant path from recent request")
 
-Notes
+#### Notes for developers:
+
+You can use this to dump json and raw data instead of obj:
+```
+node dump_obj.js 20527061605273514 20 --dump-json --dump-raw
+```
+
+URL structure:
 ```
 "https://kh.google.com/rt/🅐/🅑"
  - 🅐: planet
@@ -42,7 +46,10 @@ Notes
           - ❹: epoch
           - ❺: texture format
           - ❻: imagery epoch (sometimes)
+```
 
+Misc:
+```
 General info:
  - Everything is stored in an octree.
 
