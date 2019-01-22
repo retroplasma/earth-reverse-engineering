@@ -2,7 +2,8 @@
 
 ![example](example.jpg "example")
 
-Earth to OBJ file downloader
+#### Earth to OBJ file downloader
+We can dump a textured 3D model (*.obj with *.bmp and *.jpg) using these scripts. They require [Node.js](https://nodejs.org/en/) v8 with [npm](https://www.npmjs.com/):
 ```sh
 # install dependencies (tested with node@8.15.0, npm@6.4.1)
 npm install
