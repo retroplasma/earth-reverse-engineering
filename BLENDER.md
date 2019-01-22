@@ -12,7 +12,7 @@ bpy.data.textures["Kd.002"].extension = 'EXTEND'
 for x in bpy.data.textures: x.extension = 'EXTEND'
 ```
 
-Everything jitters? Try this and then open `model.2.obj` instead of `model.obj`:
+Everything jitters? Try this node.js script and then open `model.2.obj` instead of `model.obj`:
 ```
 node scale_move_obj.js
 ```
