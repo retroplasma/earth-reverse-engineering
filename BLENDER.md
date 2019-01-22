@@ -12,4 +12,8 @@ bpy.data.textures["Kd.002"].extension = 'EXTEND'
 for x in bpy.data.textures: x.extension = 'EXTEND'
 ```
 
-Everything jitters? Try [node scale_move_obj.js](scale_move_obj.js) and then open `model.2.obj` instead of `model.obj`.
+Everything jitters? Try this and then open `model.2.obj` instead of `model.obj`:
+```
+node scale_move_obj.js
+```
+It produces a scaled and moved obj file. It can prevent 3d viewers like blender from jittering. You might want to change the constants in the script.
