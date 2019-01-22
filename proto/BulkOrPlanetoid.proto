@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+/*
+ * work in progress
+ */
+ 
+message BulkOrPlanetoid {
+  message HeadNode {
+    string path = 1;
+    int64 epoch = 2;
+  }
+
+  HeadNode headNode = 2;
+
+  int64 defaultImageryEpoch = 5;
+  int64 defaultTextureFormat_maybe = 6; // 41 = 6, 1 = 1
+
+  repeated Meta data = 1;
+
+  message Meta {
+    
+    int32 unknown1 = 1;
+    int32 epoch = 2; // defaults to self
+    float metersPerTexel_1 = 4;
+    int32 planetoidEpoch5 = 5;
+    
+    oneof unknown_oneof {
+      bytes unknown3 = 3;
+      int32 unknown8 = 8;
+    }
+  }
+
+  message Metaa {}
+
+  enum Texture {
+    UNKNOWN = 0;
+    JPG = 1;
+    DXT = 41;
+  }
+
+  repeated bytes unknown_bytes_24 = 3;
+  repeated float metersPerTexel_2 = 4;
+}

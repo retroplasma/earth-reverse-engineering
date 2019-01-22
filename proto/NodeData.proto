@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+/*
+ * work in progress
+ */
+ 
+message Node {
+    repeated double matrix_globe_from_mesh = 1;
+    repeated Mesh meshes = 2;
+
+    message Mesh {
+        repeated bytes vertices_probably = 1;
+        repeated int64 indices = 3;
+        Texture texture = 6;
+        message Texture {
+            repeated bytes texture_data = 1;
+            int64 texture_format = 2;
+            int64 texture_width_or_height = 3; // not always here
+            int64 texture_height_or_width = 4; // not always here
+        }
+    }
+}
+
