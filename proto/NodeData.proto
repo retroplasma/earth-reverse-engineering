@@ -14,13 +14,21 @@ message Node {
 		Texture texture = 6;
 		message Texture {
 			bytes texture_data = 1;
-			int64 texture_format = 2;
-			int64 texture_width_or_height = 3; // not always here
-			int64 texture_height_or_width = 4; // not always here
+			TextureFormat texture_format = 2;
+			int64 texture_width = 3; // defaults to 256
+			int64 texture_height = 4; // defaults to 256
 		}
 		bytes uv = 7;
 		repeated float uv_offset_and_scale = 10;
 		bytes normals = 11;
+	}
+
+	bytes for_normals = 8;
+
+	enum TextureFormat {
+		_ = 0;
+		JPG = 1;
+		DXT1 = 6;
 	}
 }
 
