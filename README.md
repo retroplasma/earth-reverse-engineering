@@ -17,17 +17,13 @@ node lat_long_to_octant.js 37.420806884765625 -122.08419799804688
 # dump textured obj (octant from example.jpg)
 node dump_obj.js 20527061605273514 20
 
-# prevents 3d viewers like blender from jittering
-# produces scaled + moved model.2.obj from model.obj
-node scale_move_obj.js
-
 # dump json and raw data
 node dump_obj.js 20527061605273514 20 --dump-json --dump-raw
 ```
+How to open with Blender: [BLENDER.md](BLENDER.md)
 
+Alternative method for finding octant:
 ![find octant](how_to_find_octant.jpg "open maps and dev tools, switch to satellite, fly to destination, search for NodeData, copy octant path from recent request")
-
-
 
 Notes
 ```
