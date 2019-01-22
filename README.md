@@ -1,6 +1,6 @@
 [![Gitter Chat](https://badges.gitter.im/earth-reverse-engineering/lobby.svg)](https://gitter.im/earth-reverse-engineering/lobby)
 
-![example](example.jpg "example")
+![header](header.png "header")
 
 #### Earth to OBJ file downloader
 We can dump a textured 3D model (*.obj with *.bmp and *.jpg) using these scripts. They require [Node.js](https://nodejs.org/en/) v8 with [npm](https://www.npmjs.com/):
