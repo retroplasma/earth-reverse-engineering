@@ -5,17 +5,17 @@
 #### Earth to OBJ file downloader
 We can dump a textured 3D model (*.obj with *.bmp and *.jpg) using these scripts. They require [Node.js](https://nodejs.org/en/) v8 with [npm](https://www.npmjs.com/):
 ```sh
-# install dependencies (tested with node@8.15.0, npm@6.4.1)
+# Install dependencies (tested with node@8.15.0, npm@6.4.1)
 npm install
 
-# usage
+# Usage:
 # node dump_obj.js [octant] [max_level] [[--dump-json]] [[--dump-raw]] [[--parallel-search]]
 # node lat_long_to_octant.js [latitude] [longitude]
 
-# find octant of latitude and longitude
+# Find octant of latitude and longitude
 node lat_long_to_octant.js 37.420806884765625 -122.08419799804688
 
-# dump textured obj (octant from example.jpg)
+# Dump textured obj (octant from example.jpg)
 node dump_obj.js 20527061605273514 20
 ```
 How to open with Blender: [BLENDER.md](BLENDER.md)
