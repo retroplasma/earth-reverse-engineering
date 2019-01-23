@@ -9,7 +9,7 @@ const PLANET = 'earth';
 const URL_PREFIX = `https://kh.google.com/rt/${PLANET}/`;
 const DL_DIR = './downloaded_files';
 const [DUMP_OBJ_DIR, DUMP_JSON_DIR, DUMP_RAW_DIR] = ['obj', 'json', 'raw'].map(x => path.join(DL_DIR, x));
-const {OCTANT, MAX_LEVEL, DUMP_JSON, DUMP_RAW, PARALLEL_SEARCH} = require('./lib/parse-command-line')(__filename);
+const {OCTANTS, MAX_LEVEL, DUMP_JSON, DUMP_RAW, PARALLEL_SEARCH} = require('./lib/parse-command-line')(__filename);
 const DUMP_OBJ = !(DUMP_JSON || DUMP_RAW);
 /****************************************************************/
 
@@ -23,7 +23,7 @@ async function run() {
 	const planetoid = await getPlanetoid();
 	const rootEpoch = planetoid.bulkMetadataEpoch[0];
 
-	const objDir = path.join(DUMP_OBJ_DIR, `${OCTANT}-${MAX_LEVEL}-${rootEpoch}`);
+	const objDir = path.join(DUMP_OBJ_DIR, `${OCTANTS.join('+')}-${MAX_LEVEL}-${rootEpoch}`);
 	if (DUMP_OBJ) {
 		fs.removeSync(objDir);
 		fs.ensureDirSync(objDir);		
@@ -97,7 +97,9 @@ async function run() {
 		}
 	}
 
-	await search(OCTANT, MAX_LEVEL);
+	for (const oct of OCTANTS) {
+		await search(oct, MAX_LEVEL);
+	}
 
 	console.log("octants: " + keys.length);
 
