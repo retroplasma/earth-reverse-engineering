@@ -1,0 +1,17 @@
+syntax = "proto2";
+
+package earth.myphotos;
+
+option optimize_for = CODE_SIZE;
+
+message MyPhotos {
+    repeated MyPhoto photo = 1;
+    message MyPhoto {
+        optional string id = 1;
+        optional double latitude = 2;
+        optional double longitude = 3;
+        optional string url = 4;
+        optional string name = 5;
+        optional int64 timestamp = 6;
+    }
+}

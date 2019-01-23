@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+package earth.localfilesystem;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.localfilesystem";
+
+message FileList {
+    repeated string filenames = 1;
+}

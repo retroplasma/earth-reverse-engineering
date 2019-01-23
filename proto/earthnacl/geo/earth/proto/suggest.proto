@@ -1,0 +1,73 @@
+syntax = "proto2";
+
+package earth_suggest;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.geo.earth.suggest";
+
+message EarthInterpretation {
+    repeated Term term = 1;
+    message Term {
+        optional int32 start = 1;
+        optional int32 end = 2;
+        optional int32 match_start = 3;
+        optional int32 match_end = 4;
+    }
+}
+
+message SuggestText {
+    optional string text = 1;
+    optional EarthInterpretation interpretation = 2;
+}
+
+message VoyagerSuggestion {
+    optional string voyager_deeplink = 1;
+    optional SuggestText voyager_title = 2;
+    optional SuggestText voyager_snippet = 3;
+}
+
+message AnnotatedText {
+    optional string text = 1;
+    
+    repeated Match match = 2;
+    message Match {
+        optional int32 start = 1;
+        optional int32 end = 2;
+    }
+}
+
+message EarthSuggestion {
+    optional string query = 1;
+    optional EarthInterpretation interpretation = 2;
+    
+    optional Type type = 3;
+    enum Type {
+        PLACE = 0;
+        CATEGORICAL_SEARCH = 1;
+        VOYAGER = 2;
+        VOYAGER_PANEL = 3;
+    }
+    
+    optional string earth_deeplink = 8;
+    optional AnnotatedText primary_text = 9;
+    optional AnnotatedText secondary_text = 10;
+    optional ClientOnlyData client_only_data = 11;
+    optional string voyager_guid = 4;
+    optional VoyagerSuggestion voyager_suggestion = 5;
+    optional string primary_id = 6;
+    optional string secondary_id = 7;
+}
+
+message EarthSuggestResponse {
+    repeated EarthSuggestion suggestion = 1;
+}
+
+message ClientOnlyData {
+    optional VoyagerClientOnlyData voyager_client_only_data = 1;
+}
+
+message VoyagerClientOnlyData {
+    optional string voyager_guid = 1;
+    optional string voyager_balloon_feature_id = 2;
+}
