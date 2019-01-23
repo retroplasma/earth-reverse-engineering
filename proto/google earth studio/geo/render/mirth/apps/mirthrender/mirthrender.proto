@@ -1,0 +1,140 @@
+syntax = "proto2";
+
+package mirth_apps_mirthrender;
+
+option optimize_for = SPEED;
+
+message RenderRequest {
+    repeated RenderParameters render_parameters = 1;
+    optional bool include_debug_context = 2 [default = false];
+    optional double frames_per_second = 3;
+    optional int32 first_frame_number = 4;
+    optional int32 warmup_frame_count = 5;
+    optional Attribution attribution = 6;
+    optional string name = 7;
+    repeated string kml_url = 8;
+    optional bool render_as_individual_images = 9 [default = false];
+}
+
+message RenderParameters {
+    optional ImageSpec image_spec = 1;
+    optional double near_clip = 11 [default = 0];
+    optional double far_clip = 12 [default = 0];
+    optional EarthModeOptions earth_mode_options = 3;
+    optional ScreenFade screen_fade = 6;
+    repeated KmlOptions kml_options = 8;
+    optional KmlTime kml_time = 9;
+    optional bool base_map_enabled = 10;
+    
+    oneof cam_oneof {
+        LookAtCamera camera = 2;
+        WorldToEyeCamera world_to_eye_camera = 7;
+    }
+    
+    oneof simulation_date_and_time_oneof {
+        double simulation_date_and_time = 4;
+        string simulation_date_and_time_string = 5;
+    }
+}
+
+message LookAtCamera {
+    optional double longitude = 1;
+    optional double latitude = 2;
+    optional double altitude = 3;
+    optional double heading = 4;
+    optional double tilt = 5;
+    optional double roll = 6;
+    optional double fov_y = 7;
+    optional double range = 8;
+}
+
+message WorldToEyeCamera {
+    repeated float data = 1 [packed = true];
+    optional double fov_y = 2;
+}
+
+message EarthModeOptions {
+    optional bool water_enabled = 1;
+    optional bool buildings_enabled = 2;
+    optional bool draped_vectors_enabled = 3;
+    optional bool labels_enabled = 4;
+    optional bool date_time_rendering_enabled = 5;
+    optional double lod_bias = 6;
+    optional double lod_tilt_correction = 7;
+    optional bool clouds_enabled = 8;
+    optional double clouds_fading_min_altitude = 9;
+    optional double clouds_fading_max_altitude = 10;
+    optional bool clouds_datetime_enabled = 11;
+    optional string clouds_datetime_string = 12;
+    optional bool force_fragment_atmosphere = 13;
+    optional bool atmosphere_enabled = 14;
+    optional bool stars_enabled = 15;
+    optional WaterSpecularMode water_specular_mode = 16;
+    optional double water_specular_intensity = 17;
+}
+
+message KmlOptions {
+    optional int32 index = 1 [default = 0];
+    optional bool visibility = 2 [default = true];
+    optional double opacity = 3 [default = 1];
+}
+
+message KmlTime {
+    optional bool enabled = 1;
+    optional string begin = 2;
+    optional string end = 3;
+}
+
+message ScreenFade {
+    optional double fade = 1 [default = 1];
+    optional double red = 2 [default = 0];
+    optional double green = 3 [default = 0];
+    optional double blue = 4 [default = 0];
+}
+
+message ImageSpec {
+    optional ImageFormat format = 1;
+    optional uint32 width = 2;
+    optional uint32 height = 3;
+    optional uint32 quality = 4 [default = 85];
+    optional double crf = 5 [default = 23];
+    optional int32 bitrate = 6 [default = 0];
+}
+
+message Image {
+    optional ImageSpec image_spec = 1;
+    optional bytes data = 2;
+    optional double near_clip = 3;
+    optional double far_clip = 4;
+    optional double frame_number = 5;
+    optional double frame_count = 7;
+    repeated string copyright_string = 6;
+}
+
+message Attribution {
+    optional bool render_attribution = 1 [default = true];
+    optional double copyright_font_height_percent = 2 [default = 1.2];
+}
+
+message DebugContext {
+    optional string calltrace = 1;
+}
+
+message RenderResponse {
+    repeated Image image = 1;
+    optional DebugContext debug_context = 2;
+}
+
+enum WaterSpecularMode {
+    WATER_SPECULAR_AUTO = 0;
+    WATER_SPECULAR_ON = 1;
+    WATER_SPECULAR_OFF = 2;
+}
+
+enum ImageFormat {
+    PNG = 0;
+    JPEG = 1;
+    RAW_RGBA8888_DEPTH32 = 2;
+    RAW_RGBA8888 = 3;
+    MP4 = 4;
+}
