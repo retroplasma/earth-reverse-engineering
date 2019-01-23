@@ -6,14 +6,15 @@ We can use Blender to see if it worked:
 - Add "Hemi" lamp
 - Set "Viewport Shading" to "Rendered"
 
-Blender Script for correct texture extension:
+Textures look weird? Try this Blender Script for correct texture extension:
 ```
-bpy.data.textures["Kd.002"].extension = 'EXTEND'
 for x in bpy.data.textures: x.extension = 'EXTEND'
 ```
 
-Everything jitters? Try this node.js script and then open `model.2.obj` instead of `model.obj`:
+Everything jitters? Try to scale and move the model. You can use this node.js script and then open `model.2.obj` instead of `model.obj` (constants for scaling/moving are inside the script):
 ```
 node scale_move_obj.js
-```
-It produces a scaled and moved obj file. It can prevent 3d viewers like blender from jittering. You might want to change the constants in the script.
+``` 
+
+Here's how the result (octant 20527061605273514, max-level 20) should look like:
+![example](example.jpg "example")
