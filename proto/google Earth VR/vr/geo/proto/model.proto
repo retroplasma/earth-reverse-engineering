@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/base.proto";
+
+option optimize_for = SPEED;
+
+message ModelResource {
+    optional string name = 1;
+    optional string geometry_path = 2;
+    optional string texture_path = 3;
+    optional Matrix4d model_from_raw_data_matrix = 4;
+}
+
+message ModelTransform {
+    optional CoordinateSpace reference_space = 1 [default = ROOM_SPACE];
+    optional Matrix4d reference_from_model_matrix = 2;
+    optional Location geo_location = 3;
+}

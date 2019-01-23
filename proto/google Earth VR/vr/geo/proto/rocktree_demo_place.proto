@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/datetime.proto";
+import "vr/geo/proto/view.proto";
+
+option optimize_for = SPEED;
+
+message RocktreeDemoPlace {
+    optional string name = 1;
+    optional string rocktree_server_url = 2;
+    optional int64 rocktree_epoch = 3;
+    optional View view = 4;
+    optional DateTime datetime = 5;
+}
+
+message RocktreeDemoPlaceList {
+    repeated RocktreeDemoPlace rocktree_demo_places = 1;
+}

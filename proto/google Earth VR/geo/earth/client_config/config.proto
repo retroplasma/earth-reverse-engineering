@@ -1,0 +1,147 @@
+syntax = "proto2";
+
+package earth.config;
+
+option optimize_for = SPEED;
+
+message Search {
+    optional string server_name = 1;
+    optional string search_server = 2;
+    optional string suggest_server = 3;
+    optional string html_stylesheet = 4;
+    optional string kml_stylesheet = 5;
+    optional string entity_details_server = 6;
+}
+
+message PaintParameters {
+    optional bytes data = 1;
+}
+
+message Filmstrip {
+    optional string alleycat_url_template = 1;
+    optional string fallback_alleycat_url_template = 2;
+    optional string metadata_url_template = 3;
+    optional string thumbnail_url_template = 4;
+    optional string kml_url_template = 5;
+    optional string featured_tours_url = 6;
+}
+
+message PaintFeLayer {
+    optional string id = 1;
+    optional string name = 2;
+    optional bool default_visibility = 3;
+}
+
+message RasterLayer {
+    optional string id = 1;
+    optional string name = 2;
+    optional bool default_visibility = 3;
+    optional string tile_path = 4;
+    optional string startup_name = 5;
+}
+
+message VideoRasterLayer {
+    optional string id = 1;
+    optional string name = 2;
+    optional bool default_visibility = 3;
+    optional string tile_path = 4;
+    optional int64 epoch_start = 5;
+    optional int64 epoch_end = 6;
+    optional int32 num_frames = 7;
+    optional float animation_rate = 8;
+    optional float dwell_start = 9;
+    optional float dwell_end = 10;
+    optional int32 max_level = 13;
+    optional int32 clamped_altitude = 14;
+    optional string iso_date_format = 15;
+}
+
+message TimelapseVectorLayer {
+    optional string id = 1;
+    optional string name = 2;
+    optional bool default_visibility = 3;
+    optional string tile_path = 4;
+    optional int64 epoch_start = 5;
+    optional int64 epoch_end = 6;
+    optional int32 num_frames = 7;
+    optional float animation_rate = 8;
+    optional float dwell_start = 9;
+    optional float dwell_end = 10;
+    optional string vertex_shader_url = 11;
+    optional string fragment_shader_url = 12;
+    optional int32 max_level = 13;
+    optional int32 clamped_altitude = 14;
+    optional string iso_date_format = 15;
+}
+
+message MapsEngineMap {
+    optional string id = 1;
+    optional bool default_visibility = 2;
+    optional string paint_fe_server = 3;
+}
+
+message MapsLayersBackendMap {
+    optional string id = 1;
+    optional bool default_visibility = 2;
+    optional string paint_fe_server = 3;
+    optional string name = 4;
+}
+
+message BaseLayerStyle {
+    optional string name = 1;
+    optional string description = 2;
+    optional bool default_selected = 3 [default = false];
+    optional bool editable = 4 [default = false];
+    optional string thumbnail_id = 5;
+    repeated uint32 feature_type = 6;
+}
+
+message Database {
+    optional string rocktree_url = 1;
+    repeated string mapsengine_map = 2;
+    optional string paint_fe_server = 3;
+    optional string folder_name = 4;
+    repeated PaintFeLayer paint_fe_layer = 5;
+    repeated MapsEngineMap gme_map = 6;
+    repeated MapsLayersBackendMap mlb_map = 7;
+    repeated VideoRasterLayer video_raster_layer = 8;
+    repeated BaseLayerStyle base_layer_style = 9;
+    optional bool layer_style_collapse_pois = 10;
+    repeated TimelapseVectorLayer timelapse_vector_layer = 11;
+    optional string rocktree_time_url = 12;
+    repeated RasterLayer raster_layer = 13;
+}
+
+message OutOfBox {
+    optional string url = 1;
+    optional uint32 major_revision = 2;
+}
+
+message AndroidJavascriptSettings {
+    optional uint32 earth_feed_javascript_minimum_api_level = 1;
+    optional uint32 arbitrary_javascript_minimum_api_level = 2;
+}
+
+message ConfigUrl {
+    optional string name = 1;
+    optional string uri = 2;
+}
+
+message CelestialBody {
+    optional string id = 1;
+    optional string localized_name = 2;
+    optional string rocktree_url = 3;
+    optional string paintfe_layer_id = 4;
+}
+
+message Config {
+    repeated Search search = 1;
+    optional PaintParameters paint_parameters = 2;
+    optional Filmstrip filmstrip = 3;
+    optional Database database = 4;
+    optional string legal_country = 5;
+    repeated ConfigUrl config_url = 6;
+    optional OutOfBox out_of_box = 7;
+    optional AndroidJavascriptSettings android_javascript_settings = 8;
+    repeated CelestialBody celestial_body = 10;
+}

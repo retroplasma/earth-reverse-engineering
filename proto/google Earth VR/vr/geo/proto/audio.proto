@@ -1,0 +1,41 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/base.proto";
+
+option optimize_for = SPEED;
+
+message AudioResource {
+    optional string name = 1;
+    optional string audio_path = 2;
+    
+    optional AudioType audio_type = 3 [default = DIRECT_STEREO];
+    enum AudioType {
+        DIRECT_STEREO = 0;
+        SPATIAL_MONO = 1;
+        SOUND_FIELD = 2;
+    }
+}
+
+message AudioPose {
+    optional CoordinateSpace reference_space = 1 [default = ROOM_SPACE];
+    optional float audio_heading_in_reference_space_degrees = 3;
+    
+    oneof position {
+        Vector3d audio_position_in_reference_space = 2;
+        Location audio_position_geo_location = 4;
+    }
+}
+
+message AudioAttenuation {
+    optional FalloffModel falloff_model = 4;
+    enum FalloffModel {
+        LOGARITHMIC = 0;
+        LINEAR = 1;
+        NONE = 2;
+    }
+    
+    optional float min_distance_in_meters = 5;
+    optional float max_distance_in_meters = 6;
+}

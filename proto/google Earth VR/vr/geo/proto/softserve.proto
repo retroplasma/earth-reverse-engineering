@@ -1,0 +1,35 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/base.proto";
+import "vr/geo/proto/datetime.proto";
+
+option optimize_for = SPEED;
+
+message SoftserveHeadbox {
+    optional Matrix4d keyhole_from_headbox_matrix = 1;
+    optional Vector3d size_headbox_space = 2;
+    optional double scale = 3;
+    optional DateTime datetime = 4;
+}
+
+message SoftserveViewParameters {
+    optional Matrix4d eye_from_headbox_matrix = 1;
+    optional string ldi_path = 2;
+    optional string softserve_view_proto_path = 3;
+    optional string png_rgba_path = 4;
+    optional string png_depth_path = 5;
+    optional string raw_rgba_path = 6;
+    optional string raw_depth_path = 7;
+    optional string mirth_renderer_request_proto_path = 8;
+    optional uint32 view_group_index = 9;
+    optional uint32 view_index = 10;
+}
+
+message SoftserveRenderParameters {
+    optional SoftserveHeadbox headbox = 1;
+    optional uint32 image_width = 2;
+    optional uint32 image_height = 3;
+    repeated SoftserveViewParameters view_parameters = 4;
+}

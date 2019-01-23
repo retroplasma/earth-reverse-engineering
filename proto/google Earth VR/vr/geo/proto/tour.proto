@@ -1,0 +1,104 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/audio.proto";
+import "vr/geo/proto/datetime.proto";
+import "vr/geo/proto/image.proto";
+import "vr/geo/proto/model.proto";
+import "vr/geo/proto/view.proto";
+
+option optimize_for = SPEED;
+
+message Tour {
+    optional string name = 1;
+    optional string soundtrack_file = 9 [deprecated = true];
+    repeated ModelResource model_resource = 7;
+    repeated AudioResource audio_resource = 8;
+    repeated ImageResource image_resource = 11;
+    repeated ViewKeyframe view_keyframes = 2;
+    repeated ScreenFadeKeyframe screen_fade_keyframes = 3;
+    repeated SimulationTimeKeyframe simulation_time_keyframes = 4;
+    repeated SoundKeyframe sound_keyframes = 5;
+    repeated ModelKeyframe model_keyframes = 6;
+    repeated ConfigKeyframe config_keyframes = 10;
+    repeated ColorGradingKeyframe color_grading_keyframes = 12;
+}
+
+message ViewKeyframe {
+    optional float timestamp_seconds = 1;
+    optional View view = 2;
+    optional string name = 3;
+    optional string description = 4;
+    repeated PreservableActorFeature preserve_actor_features = 5;
+}
+
+message ScreenFadeKeyframe {
+    optional float timestamp_seconds = 1;
+    optional float opacity = 2;
+}
+
+message SimulationTimeKeyframe {
+    optional float timestamp_seconds = 1;
+    optional DateTime simulation_time = 2;
+    
+    optional TimeChangeType type = 3 [default = FIXED_PLANET];
+    enum TimeChangeType {
+        FIXED_PLANET = 0;
+        FIXED_SKY = 1;
+    }
+}
+
+message SoundKeyframe {
+    optional float timestamp_seconds = 1;
+    
+    optional SoundAction sound_action = 2 [default = PLAY];
+    enum SoundAction {
+        PLAY = 0;
+        PLAY_LOOPING = 1;
+        STOP = 2;
+        SKIP_TO_TIME = 3;
+        ADJUST_VOLUME = 4;
+    }
+    
+    optional float sound_action_parameter = 3;
+    optional string name = 4;
+    optional AudioPose pose = 5;
+    repeated PreservableActorFeature preserve_actor_features = 6;
+    optional AudioAttenuation attenuation = 7;
+}
+
+message ModelKeyframe {
+    optional float timestamp_seconds = 1;
+    
+    optional ModelAction action = 2 [default = SHOW];
+    enum ModelAction {
+        SHOW = 0;
+        HIDE = 1;
+        HIDE_ALL = 2;
+    }
+    
+    optional string name = 3;
+    optional ModelTransform transform = 4;
+}
+
+message ConfigKeyframe {
+    optional float timestamp_seconds = 1;
+    optional bool labels_enabled = 2;
+    
+    optional TutorialAction tutorial_action = 3;
+    enum TutorialAction {
+        TUTORIAL_SHOW_WELCOME_TEXT = 0;
+        TUTORIAL_HIDE_WELCOME_TEXT = 1;
+    }
+}
+
+message ColorGradingKeyframe {
+    optional float timestamp_seconds = 1;
+    optional string lut_image_name = 2;
+}
+
+enum PreservableActorFeature {
+    ACTOR_HEAD_POSITION = 0;
+    ACTOR_HEADING = 1;
+}

@@ -1,0 +1,21 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/base.proto";
+
+option optimize_for = SPEED;
+
+message View {
+    optional Location location = 1;
+    optional Vector3d anchor_point = 2;
+    optional double heading = 3;
+    optional CoordinateSpace reference_space = 4 [default = START_SPACE];
+    optional double viewer_scale = 5;
+    
+    optional UpDirection up_direction = 6;
+    enum UpDirection {
+        SKY = 0;
+        LOCAL_NORTH = 1;
+    }
+}

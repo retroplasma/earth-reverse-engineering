@@ -1,0 +1,37 @@
+syntax = "proto2";
+
+package vr.geo.narrative;
+
+import "vr/geo/proto/base.proto";
+import "vr/geo/proto/place_of_interest.proto";
+
+option optimize_for = SPEED;
+
+message Quaterniond {
+    required double x = 1;
+    required double y = 2;
+    required double z = 3;
+    required double w = 4;
+}
+
+message Transformd {
+    optional Vector3d translation = 1;
+    optional Quaterniond quaternion = 2;
+    optional double scale = 3;
+}
+
+message DevicePose {
+    optional bool was_tracked = 1 [default = true];
+    optional Transformd keyhole_from_device_transform = 2;
+}
+
+message ActorPose {
+    repeated DevicePose device_poses = 1;
+    optional bool pointer_was_on = 2 [default = false];
+    optional Vector3d pointer_intersection_in_keyhole_space = 3;
+}
+
+message Narrative {
+    optional PlaceOfInterestProto starting_view = 1;
+    repeated ActorPose actor_poses = 2;
+}

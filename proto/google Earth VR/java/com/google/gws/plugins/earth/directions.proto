@@ -1,0 +1,214 @@
+syntax = "proto2";
+
+package earth;
+
+import "java/com/google/gws/plugins/earth/geometry.proto";
+
+option optimize_for = SPEED;
+option java_outer_classname = "EarthDirections";
+option java_package = "com.google.earth";
+
+message CompactPolyline {
+    repeated sint32 latitude_e7_diff = 1 [packed = true];
+    repeated sint32 longitude_e7_diff = 2 [packed = true];
+    repeated sint32 altitude_mm_diff = 3 [packed = true];
+}
+
+message Address {
+    repeated string line = 1;
+    optional string place_title = 2;
+    optional string single_line_address = 3;
+}
+
+message WaypointQuery {
+    optional LatLng position = 3;
+}
+
+message WaypointLocation {
+    optional WaypointQuery waypoint_query = 1;
+    optional Address address = 2;
+}
+
+message WaypointResult {
+    optional WaypointLocation waypoint = 1;
+    optional string original_query = 5;
+}
+
+message Distance {
+    optional string formatted_value = 2;
+}
+
+message Duration {
+    optional string formatted_value = 2;
+}
+
+message ComponentTextBox {
+    optional string text = 1;
+    optional bool bold = 2 [default = false];
+    optional string background_color = 3;
+    optional string text_color = 4;
+    optional Time time = 5;
+    optional string tooltip_text = 6;
+}
+
+message ComponentIcon {
+    optional string id = 2;
+}
+
+message RenderableComponent {
+    optional Type type = 1;
+    enum Type {
+        TRAVEL_MODE = 1;
+        RAW_TEXT = 2;
+        AGENCY = 3;
+        VEHICLE_TYPE = 4;
+        LINE = 5;
+        TRANSIT_TRIP_NAME = 6;
+        HEADING = 7;
+        BLOCK_TRANSFER = 8;
+        TRANSIT_GROUP_SEPARATOR = 9;
+        ALTERNATE_LINE_SEPARATOR = 10;
+        EXPRESS_TYPE = 15;
+        DESTINATION = 16;
+        HEADSIGN = 17;
+        TIME = 18;
+        HIGHWAY = 11;
+        ROAD = 12;
+        VIA = 13;
+        TURN = 14;
+    }
+    
+    optional ComponentTextBox text_box = 2;
+    optional ComponentIcon icon = 3;
+}
+
+message Schedule {
+    optional Time departure_time = 1;
+    optional Time arrival_time = 2;
+}
+
+message TransitAgency {
+    optional string name = 1;
+    optional LoggedLink link = 8;
+}
+
+message TransitSummary {
+    repeated TransitAgency transit_agency = 5;
+}
+
+message InspectionView {
+    optional Camera camera = 1;
+    optional Camera camera_3d = 5;
+    optional LatLng position = 3;
+}
+
+message Summary {
+    optional TravelMode travel_mode = 1;
+    optional string text = 2;
+    optional Distance distance = 3;
+    optional Duration duration = 4;
+    optional Schedule schedule = 6;
+    optional TransitSummary transit = 7;
+    optional InspectionView inspection_view = 8;
+    repeated RenderableComponent renderable = 15;
+}
+
+message Step {
+    optional Summary summary = 1;
+    
+    optional ManeuverType maneuver_type = 7 [default = MANEUVER_UNKNOWN];
+    enum ManeuverType {
+        MANEUVER_UNKNOWN = 0;
+        DEPART = 1;
+        NAME_CHANGE = 2;
+        STRAIGHT = 12;
+        LANE_CHANGE = 29;
+        TURN = 3;
+        COUNTED_TURN = 16;
+        UTURN = 4;
+        ON_RAMP = 5;
+        OFF_RAMP = 6;
+        FORK = 7;
+        MERGE = 8;
+        FERRY = 13;
+        FERRY_TRAIN = 14;
+        EASTER_EGG = 15;
+        ROUNDABOUT_ENTER = 9;
+        ROUNDABOUT_EXIT = 10;
+        ROUNDABOUT_ENTER_AND_EXIT = 11;
+        PEDESTRIAN_WALKWAY = 17;
+        PEDESTRIAN_CROSSING = 18;
+        PEDESTRIAN_OVERPASS_UNDERPASS = 19;
+        PEDESTRIAN_STATION_PATH = 20;
+        PEDESTRIAN_ACCESS_PATH = 21;
+        SIMPLE_PATH = 23;
+        PEDESTRIAN_STAIRWAY = 24;
+        PEDESTRIAN_ELEVATOR = 25;
+        PEDESTRIAN_ESCALATOR = 26;
+        PEDESTRIAN_SLOPEWAY = 27;
+        PEDESTRIAN_LEVEL_CHANGE = 28;
+        DESTINATION = 30;
+        ERROR = 22;
+    }
+}
+
+message Time {
+    optional string formatted_value = 3;
+}
+
+message TransitStopProto {
+    optional string name = 1;
+    optional Time arrival_date_time = 3;
+    optional Time departure_date_time = 4;
+    optional LatLng position = 5;
+}
+
+message TransitVehicleDetails {
+    optional TransitStopProto departure_stop = 1;
+    optional TransitStopProto arrival_stop = 2;
+    optional int32 num_transit_stops = 3;
+    repeated TransitStopProto intermediate_stop = 8;
+}
+
+message StepGroup {
+    optional Summary summary = 1;
+    repeated Step step = 2;
+    optional TransitVehicleDetails transit = 6;
+}
+
+message Path {
+    optional Summary summary = 1;
+    repeated StepGroup step_group = 2;
+}
+
+message Trip {
+    optional Summary summary = 1;
+    repeated Path path = 2;
+    optional int32 compact_polyline_index = 9;
+}
+
+message Directions {
+    repeated WaypointResult waypoint_result = 1;
+    repeated Trip trip = 2;
+    repeated CompactPolyline compact_polyline = 8;
+}
+
+message DirectionsCard {
+    optional Directions directions_result = 1;
+}
+
+message DirectionsResponse {
+    optional Directions directions = 1;
+    optional Camera camera = 3;
+    optional string debug_html = 4;
+    repeated RequestParameter request_parameter = 2;
+}
+
+enum TravelMode {
+    DRIVE = 0;
+    BICYCLE = 1;
+    WALK = 2;
+    TRANSIT = 3;
+    FLY = 4;
+    MIXED = 6;
+}

@@ -1,0 +1,35 @@
+syntax = "proto2";
+
+package earth_suggest;
+
+option java_multiple_files = true;
+option optimize_for = SPEED;
+option java_package = "com.google.gws.plugins.earth.suggest";
+
+message EarthInterpretation {
+    repeated Term term = 1;
+    message Term {
+        optional int32 start = 1;
+        optional int32 end = 2;
+        optional int32 match_start = 3;
+        optional int32 match_end = 4;
+    }
+}
+
+message EarthSuggestion {
+    optional string query = 1;
+    optional EarthInterpretation interpretation = 2;
+    
+    optional Type type = 3;
+    enum Type {
+        PLACE = 0;
+        CATEGORICAL_SEARCH = 1;
+        VOYAGER = 2;
+    }
+    
+    optional string voyager_guid = 4;
+}
+
+message EarthSuggestResponse {
+    repeated EarthSuggestion suggestion = 1;
+}

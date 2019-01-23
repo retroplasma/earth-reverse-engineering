@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+package vr.geo;
+
+option optimize_for = SPEED;
+
+message DateTime {
+    optional uint64 year = 1;
+    optional uint32 month = 2;
+    optional uint32 day = 3;
+    optional uint32 hour = 4;
+    optional uint32 minute = 5;
+    optional uint32 second = 6;
+}

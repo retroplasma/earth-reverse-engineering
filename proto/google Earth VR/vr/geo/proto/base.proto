@@ -1,0 +1,28 @@
+syntax = "proto2";
+
+package vr.geo;
+
+option optimize_for = SPEED;
+
+message Vector3d {
+    required double x = 1;
+    required double y = 2;
+    required double z = 3;
+}
+
+message Matrix4d {
+    repeated double data = 1 [packed = true];
+}
+
+message Location {
+    optional double latitude = 1;
+    optional double longitude = 2;
+    optional double altitude = 3;
+}
+
+enum CoordinateSpace {
+    START_SPACE = 0;
+    ROOM_SPACE = 1;
+    ACTOR_HEAD_SPACE = 2;
+    ACTOR_FLOOR_SPACE = 3;
+}

@@ -1,0 +1,22 @@
+syntax = "proto2";
+
+package earth;
+
+import "java/com/google/gws/plugins/earth/geometry.proto";
+
+option optimize_for = SPEED;
+option java_outer_classname = "EarthStringCamera";
+option java_package = "com.google.earth";
+
+message StringLocation {
+    optional double longitude = 2;
+    optional double latitude = 3;
+    optional string altitude = 1;
+}
+
+message StringCamera {
+    optional StringLocation location = 1;
+    optional Rotation rotation = 2;
+    optional Size screen_size = 3;
+    optional float field_of_view_y = 4;
+}

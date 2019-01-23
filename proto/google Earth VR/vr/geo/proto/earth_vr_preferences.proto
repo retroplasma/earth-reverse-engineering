@@ -1,0 +1,102 @@
+syntax = "proto2";
+
+package vr.geo;
+
+option optimize_for = SPEED;
+
+message EarthVrUserEditablePreferences {
+    optional LabelsState labels_state = 1;
+    enum LabelsState {
+        LABELS_DISABLED = 0;
+        LABELS_ENABLED = 1;
+    }
+    
+    optional ComfortModeState comfort_mode_state = 2;
+    enum ComfortModeState {
+        COMFORT_MODE_DISABLED = 0;
+        COMFORT_MODE_ENABLED = 1;
+    }
+    
+    optional StartConfiguration start_configuration = 3;
+    enum StartConfiguration {
+        NEVER_RUN = 0;
+        BEEN_RUN = 1;
+    }
+    
+    optional GuestMode guest_mode = 4;
+    enum GuestMode {
+        GUEST_MODE_OFF = 0;
+        GUEST_MODE_ON = 1;
+    }
+    
+    optional HumanScaleMode human_scale_mode = 5;
+    enum HumanScaleMode {
+        DISALLOW_HUMAN_SCALE = 0;
+        ALLOW_HUMAN_SCALE = 1;
+    }
+    
+    optional MusicMode music_mode = 6;
+    enum MusicMode {
+        MUSIC_ON = 0;
+        MUSIC_OFF = 1;
+    }
+    
+    optional string disk_cache_directory_path = 7;
+    optional uint32 disk_cache_limit_in_mb = 8;
+    
+    optional DisplayMirrorMode display_mirror_mode = 9;
+    enum DisplayMirrorMode {
+        DISPLAY_MIRROR_OFF = 0;
+        DISPLAY_MIRROR_ON = 1;
+    }
+    
+    repeated EarthVrAppFeature experienced_app_features = 10;
+}
+
+message EarthVrHiddenPreferences {
+    optional string legal_country_code = 1;
+}
+
+message EarthVrPreferencesV1 {
+    optional LabelsState labels_state = 1;
+    enum LabelsState {
+        LABELS_DISABLED = 0;
+        LABELS_ENABLED = 1;
+    }
+    
+    optional ComfortModeState comfort_mode_state = 2;
+    enum ComfortModeState {
+        COMFORT_MODE_DISABLED = 0;
+        COMFORT_MODE_ENABLED = 1;
+    }
+    
+    optional StartConfiguration start_configuration = 3;
+    enum StartConfiguration {
+        NEVER_RUN = 0;
+        BEEN_RUN = 1;
+    }
+    
+    optional GuestMode guest_mode = 4;
+    enum GuestMode {
+        GUEST_MODE_OFF = 0;
+        GUEST_MODE_ON = 1;
+    }
+    
+    optional string legal_country_code = 5;
+    
+    optional HumanScaleMode human_scale_mode = 6;
+    enum HumanScaleMode {
+        DISALLOW_HUMAN_SCALE = 0;
+        ALLOW_HUMAN_SCALE = 1;
+    }
+    
+    optional MusicMode music_mode = 7;
+    enum MusicMode {
+        MUSIC_ON = 0;
+        MUSIC_OFF = 1;
+    }
+}
+
+enum EarthVrAppFeature {
+    STREET_VIEW_IMAGERY = 0;
+}

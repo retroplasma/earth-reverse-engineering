@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package earth_reveal;
+
+option java_multiple_files = true;
+option optimize_for = SPEED;
+option java_package = "com.google.earth";
+
+message EarthRevealResponse {
+    repeated string address_line = 1;
+    optional string feature_id = 2;
+    optional string formatted_coordinates = 8;
+}

@@ -1,0 +1,19 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/datetime.proto";
+import "vr/geo/proto/view.proto";
+
+option optimize_for = SPEED;
+
+message StartLocationProto {
+    optional View view = 1;
+    optional DateTime begin_datetime = 2;
+    optional DateTime end_datetime = 3;
+    optional double time_animation_duration_seconds = 4;
+}
+
+message StartLocationList {
+    repeated StartLocationProto start_locations = 1;
+}

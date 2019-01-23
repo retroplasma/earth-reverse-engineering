@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/datetime.proto";
+import "vr/geo/proto/view.proto";
+
+option optimize_for = SPEED;
+
+message PlaceOfInterestProto {
+    optional string name = 1;
+    optional string description = 2;
+    optional View view = 3;
+    optional DateTime datetime = 4;
+}

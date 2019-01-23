@@ -1,0 +1,53 @@
+syntax = "proto2";
+
+package earth;
+
+option optimize_for = SPEED;
+option java_outer_classname = "EarthGeometry";
+option java_package = "com.google.earth";
+
+message Location {
+    optional double longitude = 2;
+    optional double latitude = 3;
+    optional double altitude = 1;
+}
+
+message Rotation {
+    optional float heading = 1;
+    optional float tilt = 2;
+    optional float roll = 3;
+}
+
+message Size {
+    optional int32 width = 1;
+    optional int32 height = 2;
+}
+
+message LatLng {
+    optional double lat = 3;
+    optional double lng = 4;
+}
+
+message LatLngRectangle {
+    optional LatLng lo = 3;
+    optional LatLng hi = 4;
+    optional LatLng deprecated_center = 1;
+    optional LatLng deprecated_span = 2;
+}
+
+message Camera {
+    optional Location location = 1;
+    optional Rotation rotation = 2;
+    optional Size screen_size = 3;
+    optional float field_of_view_y = 4;
+}
+
+message LoggedLink {
+    optional string url = 1;
+    optional string anchor_text = 2;
+}
+
+message RequestParameter {
+    optional string name = 1;
+    optional string value = 2;
+}

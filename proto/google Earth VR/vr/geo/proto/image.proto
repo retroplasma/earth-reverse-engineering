@@ -1,0 +1,12 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/base.proto";
+
+option optimize_for = SPEED;
+
+message ImageResource {
+    optional string name = 1;
+    optional string image_path = 2;
+}

@@ -1,0 +1,29 @@
+syntax = "proto2";
+
+package vr.geo;
+
+import "vr/geo/proto/place_of_interest.proto";
+import "vr/geo/proto/tour.proto";
+
+option optimize_for = SPEED;
+
+message ContentContainerProto {
+    optional ContentDescriptionProto description = 1;
+    optional ContentProto content = 2;
+}
+
+message ContentDescriptionProto {
+    repeated string display_strings = 1;
+    optional string copyright = 2;
+    optional uint32 display_area_top_left_x = 3;
+    optional uint32 display_area_top_left_y = 4;
+    optional uint32 display_area_width = 5;
+    optional uint32 display_area_height = 6;
+}
+
+message ContentProto {
+    oneof content {
+        PlaceOfInterestProto place = 1;
+        Tour tour = 2;
+    }
+}
