@@ -2,8 +2,10 @@
 
 ![header](header.png "Header image: 37.793647, -122.398938")
 
+This is an attempt to reverse-engineer undocumented parts of Google Earth. Main goal is to document the results and to provide code that emerges.
+
 #### Earth to OBJ file downloader
-We can dump a textured 3D model (*.obj with *.bmp and *.jpg) using these scripts. They require [Node.js](https://nodejs.org/en/) v8 with [npm](https://www.npmjs.com/):
+We can dump a textured 3D model (*.obj with *.bmp and *.jpg) using the following scripts. They require [Node.js](https://nodejs.org/en/) v8 and [npm](https://www.npmjs.com/):
 ```sh
 # Install dependencies (tested with node@8.15.0, npm@6.4.1)
 npm install
@@ -16,7 +18,7 @@ node dump_obj.js 20527061605273514 20
 ```
 Exported files will be in `./downloaded_files/obj`. They can be opened in Blender [like this](BLENDER.md).
 
-#### Notes for developers:
+#### Notes
 
 Alternative method for finding octant: [Open maps and dev tools, switch to satellite, fly to destination, search for NodeData, copy octant path from recent request](how_to_find_octant.jpg)
 
@@ -71,6 +73,9 @@ BulkMetaData:
   - Oriented Bounding Box
     - Dump OBB to obj: https://gist.github.com/retroplasma/5698808bfaa63ffd03f751a84fa6ce14
     - Latlong to octant using OBB (unstable): https://github.com/retroplasma/earth-reverse-engineering/blob/443a3622ce9cb12cd4460cc6dc7999cc703ae67f/experimental_latlong_to_octant.js
+
+TODO:
+   - Efficient level of detail and frustum culling (combination of octants, OBB, BVH?)
 ```
 
 Related ideas: [Racing game](https://www.reddit.com/r/Showerthoughts/comments/aex25s/race_car_video_games_could_be_amazing_if_they/) , [Minimal client](https://github.com/kaylathedev/google-maps-3d-client). WebGL + CORS should work ([test](https://retroplasma.github.io/get_planetoid_metadata.html)).
