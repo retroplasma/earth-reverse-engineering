@@ -1,0 +1,58 @@
+syntax = "proto2";
+
+package earth.measuretool;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.measuretool";
+
+message DistanceUnit {
+    optional DistanceUnitName name = 1;
+}
+
+message DistanceUnitConversion {
+    optional DistanceUnitName name = 1;
+    optional double conversion_factor = 2;
+}
+
+message AreaUnit {
+    optional AreaUnitName name = 1;
+}
+
+message AreaUnitConversion {
+    optional AreaUnitName name = 1;
+    optional double conversion_factor = 2;
+}
+
+message DistanceUnits {
+    repeated DistanceUnit units = 1;
+}
+
+message AreaUnits {
+    repeated AreaUnit units = 1;
+}
+
+enum DistanceUnitName {
+    UNKNOWN_DISTANCE_UNIT = 0;
+    CENTIMETERS = 1;
+    METERS = 2;
+    KILOMETERS = 3;
+    INCHES = 4;
+    FEET = 5;
+    YARDS = 6;
+    MILES = 7;
+    NAUTICAL_MILES = 8;
+    SMOOTS = 9;
+}
+
+enum AreaUnitName {
+    UNKNOWN_AREA_UNIT = 0;
+    SQUARE_METERS = 1;
+    SQUARE_KILOMETERS = 2;
+    SQUARE_FEET = 3;
+    SQUARE_YARDS = 4;
+    SQUARE_MILES = 5;
+    SQUARE_NAUTICAL_MILES = 6;
+    HECTARES = 7;
+    ACRES = 8;
+}

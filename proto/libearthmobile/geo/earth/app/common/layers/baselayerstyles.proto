@@ -1,0 +1,31 @@
+syntax = "proto2";
+
+package earth.layers;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.layers";
+
+message FeatureCategoryInfo {
+    optional int32 code = 1;
+    optional string name = 2;
+    repeated FeatureCategoryInfo subcategories = 3;
+}
+
+message FeatureCategories {
+    optional FeatureCategoryInfo root = 1;
+}
+
+message BaseLayerStyleInfo {
+    optional string name = 1;
+    optional string description = 2;
+    optional bool selected = 3 [default = false];
+    optional bool editable = 4 [default = false];
+    optional string thumbnail_id = 5;
+    repeated uint32 categories = 6;
+}
+
+message BaseLayerStyles {
+    repeated BaseLayerStyleInfo styles = 1;
+    optional FeatureCategoryInfo categories = 2;
+}

@@ -1,0 +1,16 @@
+syntax = "proto2";
+
+package earth.streetview;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.streetview";
+
+message StreetViewPanoInfo {
+    optional string pano_id = 1;
+    optional string location_description = 2;
+    optional string attribution_account_name = 3;
+    optional string attribution_account_url = 4;
+    optional string attribution_account_thumbnail_url = 5;
+    optional string report_a_problem_url = 6;
+}

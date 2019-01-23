@@ -1,0 +1,25 @@
+syntax = "proto2";
+
+package earth.document;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.document";
+
+enum Capability {
+    CAPABILITY_UNKNOWN = 0;
+    CAPABILITY_NONE = 1;
+    CAPABILITY_DUPLICATE = 2;
+    CAPABILITY_MODIFY_PROPERTIES = 3;
+    CAPABILITY_DELETE = 4;
+    CAPABILITY_REMOVE = 5;
+    CAPABILITY_REFRESH = 6;
+    CAPABILITY_EXPORT_AS_KML = 7;
+    CAPABILITY_COPY_TO_CLIPBOARD = 8;
+    CAPABILITY_CUT_TO_CLIPBOARD = 9;
+    CAPABILITY_SORT_CONTENTS = 10;
+    CAPABILITY_EXPAND = 11;
+    CAPABILITY_SELECT = 12;
+    CAPABILITY_MOVE_TO_CLOUD = 13;
+    CAPABILITY_ADD_FEATURES = 14;
+}

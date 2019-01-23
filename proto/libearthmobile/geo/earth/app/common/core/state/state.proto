@@ -1,0 +1,231 @@
+syntax = "proto2";
+
+package earth.state;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.geo.earth.app.common.state";
+
+message State {
+    repeated string main_application_state = 1;
+    optional CameraState camera_state = 2;
+    optional DataState data_state = 3;
+    optional bool state_url_was_deep_link = 4;
+}
+
+message CameraState {
+    optional double latitude = 1;
+    optional double longitude = 2;
+    optional double altitude = 3;
+    optional double range = 4;
+    optional double fovy = 5;
+    optional double heading = 6;
+    optional double tilt = 7;
+    optional double roll = 8;
+}
+
+message DataState {
+    optional FeatureData feature_data = 1;
+    optional bool fullscreen = 2;
+    optional NonRestorableData non_restorable_data = 3;
+    
+    optional PanoId pano_id = 4;
+    message PanoId {
+        optional string pano_id = 1;
+        optional PanoFrontEnd front_end = 2;
+    }
+    
+    optional CameraPresentationMode camera_presentation_mode = 5;
+    enum CameraPresentationMode {
+        PLANET_ORBIT = 1;
+        POI_ORBIT = 2;
+        CINEMATIC = 3;
+    }
+    
+    optional DriveData drive_data = 6;
+    optional SessionData session_data = 7;
+    
+    enum PanoFrontEnd {
+        UNKNOWN = 1;
+        ALLEYCAT = 2;
+        FIFE = 3;
+        FIFE_MEDIA_KEY = 5;
+        LOCAL = 4;
+    }
+}
+
+message FeatureData {
+    optional EarthFeedData earth_feed_data = 2;
+    optional KnowledgeCardData knowledge_card_data = 3;
+    optional SearchData search_data = 4;
+    optional TimeMachineData time_machine_data = 5;
+    optional PlayModeData play_mode_data = 6;
+}
+
+message EarthFeedData {
+    optional bool grid_open = 1 [default = false];
+    optional string guid = 2;
+    optional string balloon_feature_id = 4;
+}
+
+message KnowledgeCardData {
+    optional CardSize card_size = 3 [default = NORMAL];
+    enum CardSize {
+        COLLAPSED = 1;
+        NORMAL = 2;
+        EXPANDED = 3;
+    }
+    
+    optional bool card_set_requested = 4;
+    
+    optional CardType card_type = 5 [default = CARD_TYPE_KNOWLEDGE];
+    enum CardType {
+        CARD_TYPE_UNKNOWN = 0;
+        CARD_TYPE_SAME = 1;
+        CARD_TYPE_KNOWLEDGE = 2;
+        CARD_TYPE_DROPPED_PIN = 3;
+    }
+    
+    oneof place_id {
+        string mid = 1;
+        OysterId oyster_id = 2;
+    }
+    
+    message OysterId {
+        optional string feature_id = 1;
+        optional string layer_id = 2;
+        optional double latitude = 3;
+        optional double longitude = 4;
+        optional string query = 5;
+    }
+}
+
+message SearchData {
+    optional LatLonBox viewport = 1;
+}
+
+message TimeMachineData {
+    optional bool enabled = 1 [default = false];
+}
+
+message PlayModeData {
+    optional int32 document_key = 1;
+    optional string feature_id = 2;
+}
+
+message LatLonBox {
+    optional double north = 1;
+    optional double south = 2;
+    optional double east = 3;
+    optional double west = 4;
+}
+
+message NonRestorableData {
+    optional NonRestorableBaseLayerData base_layer_data = 1;
+    optional NonRestorableDocumentViewData document_view_data = 2;
+    optional NonRestorableEarthFeedData earth_feed_data = 3;
+    optional NonRestorableMeasureToolData measure_tool_data = 4;
+    optional NonRestorableMyPlacesData my_places_data = 5;
+    optional NonRestorableKnowledgeCardData knowledge_card_data = 6;
+    optional NonRestorableSearchData search_data = 7;
+    optional NonRestorableStreetViewData street_view_data = 8;
+    optional NonRestorableTimelapseData timelapse_data = 9;
+    optional NonRestorableTourData tour_data = 10;
+    optional NonRestorableTutorialData tutorial_data = 11;
+    optional NonRestorableNotificationData notification_data = 12;
+    optional NonRestorableInfoData info_data = 13;
+    optional NonRestorableDrawingToolData drawing_tool_data = 14;
+    optional NonRestorablePlayModeData play_mode_data = 15;
+    optional bool state_url_parsed = 16;
+}
+
+message NonRestorableBaseLayerData {
+    optional bool panel_open = 1 [default = false];
+    optional string destination_hint = 2;
+}
+
+message NonRestorableDocumentViewData {
+    optional int32 focused_document_key = 1;
+}
+
+message NonRestorableEarthFeedData {
+    optional string guid_loaded = 1;
+}
+
+message NonRestorableDrawingToolData {
+    
+}
+
+message NonRestorablePlayModeData {
+    optional bool toc_open = 1 [default = false];
+}
+
+message NonRestorableMeasureToolData {
+    optional double first_coord_latitude = 1;
+    optional double first_coord_longitude = 2;
+}
+
+message NonRestorableMyPlacesData {
+    optional bool panel_open = 1 [default = false];
+    optional string destination_hint = 2;
+}
+
+message NonRestorableKnowledgeCardData {
+    optional bool fly_immediately_requested = 1;
+    optional string feature_id = 2;
+}
+
+message NonRestorableInfoData {
+    optional int32 im_feeling_lucky_count = 1;
+    optional bool balloon_or_panel_shown = 2;
+}
+
+message NonRestorableSearchData {
+    optional bool panel_open = 1 [default = false];
+    optional string destination_hint = 2;
+    optional bool has_results = 3 [default = false];
+    optional bool suppress_search_flyto = 4 [default = false];
+}
+
+message NonRestorableStreetViewData {
+    optional bool coverage_overlay_shown = 1 [default = false];
+}
+
+message NonRestorableTimelapseData {
+    optional bool controls_visible = 1 [default = false];
+}
+
+message NonRestorableTourData {
+    optional bool tour_player_visible = 1;
+}
+
+message NonRestorableTutorialData {
+    optional bool is_tutorial_shown = 1;
+}
+
+message NonRestorableNotificationData {
+    optional bool allow_notification_enrollment_ui = 13;
+}
+
+message DriveData {
+    optional DriveAction action = 1;
+}
+
+message DriveAction {
+    oneof DriveActionType {
+        DriveOpenAction open_document = 1;
+        DriveCreateAction create_document = 2;
+    }
+}
+
+message DriveCreateAction {
+    optional string folder_id = 1;
+}
+
+message DriveOpenAction {
+    optional string document_id = 1;
+}
+
+message SessionData {
+    optional string session_identifier = 1;
+}

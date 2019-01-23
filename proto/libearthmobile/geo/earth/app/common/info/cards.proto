@@ -1,0 +1,28 @@
+syntax = "proto2";
+
+package earth.info;
+
+import "geo/earth/app/common/core/state/state.proto";
+import "java/com/google/gws/plugins/earth/knowledge/renderable-entity.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.info";
+
+message CardActionSelection {
+    optional uint32 card_index = 1;
+    optional CardAction action = 2;
+}
+
+message ShowCardRequest {
+    optional earth_knowledge.RenderableEntity renderable_entity = 1;
+    optional uint32 stack_size = 2;
+    optional .earth.state.KnowledgeCardData.CardType card_type = 3;
+    repeated CardAction available_actions = 4;
+}
+
+enum CardAction {
+    CARD_ACTION_UNKNOWN = 0;
+    CARD_ACTION_FLY_TO = 1;
+    CARD_ACTION_MEASURE = 2;
+}

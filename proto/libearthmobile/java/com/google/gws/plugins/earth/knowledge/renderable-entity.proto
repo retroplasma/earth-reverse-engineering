@@ -1,0 +1,156 @@
+syntax = "proto2";
+
+package earth_knowledge;
+
+import "java/com/google/gws/plugins/earth/geometry.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.gws.plugins.earth.knowledge";
+
+message RenderableEntity {
+    optional string title = 1;
+    optional string known_for = 2;
+    repeated string description = 3;
+    optional string mid = 8;
+    
+    repeated Source source = 4;
+    message Source {
+        optional string anchor_text = 1;
+        optional string url = 2;
+    }
+    
+    optional Image image = 5;
+    message Image {
+        optional string url = 1;
+        optional int32 width = 2;
+        optional int32 height = 3;
+        optional ImageAttribution attribution = 4;
+        optional string report_a_problem_url = 5;
+        optional ImageDescription description = 6;
+    }
+    
+    optional Image large_image = 10;
+    
+    repeated Fact fact = 6;
+    message Fact {
+        optional string name = 1;
+        optional string value = 2 [deprecated = true];
+        repeated Source source = 3;
+        repeated FactValue fact_value = 4;
+        optional string search_url = 5;
+    }
+    
+    repeated CardSet card_set = 7;
+    message CardSet {
+        optional string name = 1;
+        repeated Entity card = 2;
+    }
+    
+    optional LatLon lat_lon = 9;
+    message LatLon {
+        optional double lat = 1;
+        optional double lon = 2;
+    }
+    
+    optional .earth.Camera camera = 16;
+    
+    optional BoundingBox bounding_box = 13;
+    message BoundingBox {
+        optional LatLon southwest_corner = 1;
+        optional LatLon northeast_corner = 2;
+        optional int32 recommended_zoom = 3;
+    }
+    
+    optional Image static_map_image = 11 [deprecated = true];
+    optional Image large_static_map_image = 12 [deprecated = true];
+    repeated Image image_carousel = 14;
+    repeated string address_line = 15;
+    optional string feature_id = 17;
+    optional bool is_lat_lon_entity = 28;
+    repeated Image static_map = 18;
+    repeated string phone_number = 19;
+    
+    optional OpenHours open_hours = 20;
+    message OpenHours {
+        repeated Day day = 1;
+        message Day {
+            optional string day_name = 1;
+            repeated string open_interval = 2;
+        }
+    }
+    
+    optional Website website = 21;
+    message Website {
+        optional string url = 1;
+        optional string anchor_text = 2;
+    }
+    
+    repeated EntityThumbnailList entity_thumbnail_list = 22;
+    message EntityThumbnailList {
+        optional string name = 1;
+        repeated Entity entity = 2;
+        optional string attribute_id = 3;
+        optional string search_url = 4;
+        optional Entity.EntityType entity_type = 5;
+    }
+    
+    repeated Error error = 23;
+    message Error {
+        optional string msg = 1;
+    }
+    
+    repeated Source card_source = 24;
+    
+    optional SpotlightDescription spotlight_description = 25;
+    message SpotlightDescription {
+        optional bytes proto_bytes = 1;
+        
+        optional EntityClass entity_class = 2;
+        enum EntityClass {
+            UNKNOWN = 0;
+            POINT = 1;
+            AREA = 2;
+        }
+        
+        optional bool suppress_rendering = 3;
+    }
+    
+    optional string maps_url = 26;
+    
+    repeated FunFact fun_fact = 27;
+    message FunFact {
+        optional string text = 1;
+        repeated Source source = 2;
+    }
+    
+    message ImageAttribution {
+        optional string text = 1;
+        optional string url = 2;
+        optional string thumbnail_url = 3;
+        optional string date = 4;
+        optional string copyright = 5;
+    }
+    
+    message ImageDescription {
+        optional string title = 1;
+    }
+    
+    message FactValue {
+        optional string string_value = 1;
+    }
+    
+    message Entity {
+        optional string name = 1;
+        optional string mid = 2;
+        optional Image thumbnail = 3;
+        
+        optional EntityType type = 4;
+        enum EntityType {
+            ENTITY_TYPE_UNKNOWN = 0;
+            ENTITY_TYPE_LOCATION = 1;
+        }
+        
+        optional string search_url = 5;
+    }
+}

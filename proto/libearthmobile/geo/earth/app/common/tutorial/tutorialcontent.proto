@@ -1,0 +1,65 @@
+syntax = "proto2";
+
+package earth.tutorial;
+
+import "geo/earth/app/common/core/state/state.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.tutorial";
+
+message TutorialContent {
+    repeated TutorialItem tutorial_item = 1;
+}
+
+message TutorialItem {
+    optional Tag tag = 1;
+    enum Tag {
+        UNKNOWN_ITEM_TAG = 0;
+        INTRO = 1;
+        SEARCH = 2;
+        KNOWLEDGE_CARDS = 3;
+        ORBIT_3D = 4;
+        VOYAGER = 5;
+        FEELING_LUCKY = 6;
+        OUTRO = 7;
+    }
+    
+    optional bool allow_user_interaction = 2 [default = false];
+    optional Placemark placemark = 3;
+    optional FlightPath flight_path = 4;
+}
+
+message Placemark {
+    optional double latitude = 1;
+    optional double longitude = 2;
+}
+
+message FlightPath {
+    optional .earth.state.CameraState camera_state = 1;
+    optional double duration = 2 [default = -1];
+    
+    optional TrajectoryMode trajectory_mode = 3 [default = PARABOLIC];
+    enum TrajectoryMode {
+        UNKNOWN_TRAJECTORY_MODE = 0;
+        LINEAR = 1;
+        PARABOLIC = 2;
+        CONTEXTUAL = 3;
+    }
+    
+    optional PresentationMode presentation_mode = 4 [default = STATIC];
+    enum PresentationMode {
+        UNKNOWN_PRESENTATION_MODE = 0;
+        STATIC = 1;
+        POI_ORBIT = 2;
+        PLANET_ORBIT = 3;
+        CINEMATIC = 4;
+    }
+    
+    optional ElevationType elevation_type = 5 [default = TERRAIN];
+    enum ElevationType {
+        UNKNOWN_ELEVATION_TYPE = 0;
+        SEA_LEVEL = 1;
+        TERRAIN = 2;
+    }
+}

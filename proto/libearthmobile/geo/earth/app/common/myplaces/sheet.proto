@@ -1,0 +1,43 @@
+syntax = "proto2";
+
+package earth.myplaces;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.myplaces";
+
+message SpreadsheetErrors {
+    optional string name = 1;
+    optional string spreadsheet_id = 2;
+    optional string message_string = 3;
+    repeated SubSheetErrors sheet_errors = 4;
+}
+
+message SubSheetErrors {
+    optional string name = 1;
+    optional bool no_errors = 2;
+    repeated string missing_columns = 3;
+    repeated MissingCell missing_required_fields = 4;
+    repeated MissingCell missing_optional_fields = 5;
+}
+
+message MissingCell {
+    optional int32 row = 1;
+    optional string column_title = 2;
+}
+
+message Spreadsheet {
+    optional string spreadsheet_id = 1;
+    optional string name = 2;
+    repeated SubSheet sheets = 3;
+}
+
+message SubSheet {
+    optional string name = 1;
+    optional string major_dimension = 2;
+    repeated ListValue values = 3;
+}
+
+message ListValue {
+    repeated string cells = 1;
+}

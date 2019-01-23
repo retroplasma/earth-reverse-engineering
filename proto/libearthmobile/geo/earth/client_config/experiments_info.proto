@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+package earth.config;
+
+option java_multiple_files = true;
+option optimize_for = SPEED;
+option java_package = "com.google.android.apps.earth.config";
+
+message ExperimentsInfo {
+    repeated uint32 mendel_experiment_id = 1;
+}

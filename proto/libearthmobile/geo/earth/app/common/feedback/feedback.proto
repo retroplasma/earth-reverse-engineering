@@ -1,0 +1,30 @@
+syntax = "proto2";
+
+package earth.feedback;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.feedback";
+
+message EarthViewImage {
+    optional Type image_type = 1;
+    enum Type {
+        UNKNOWN_TYPE = 0;
+        PNG = 1;
+        JPEG = 2;
+    }
+    
+    optional bytes data = 2;
+    optional CameraData camera_data = 3;
+}
+
+message CameraData {
+    optional double latitude = 1;
+    optional double longitude = 2;
+    optional double altitude = 3;
+    optional double range = 4;
+    optional double heading = 5;
+    optional double tilt = 6;
+    optional double roll = 7;
+    optional double fovy = 8;
+}

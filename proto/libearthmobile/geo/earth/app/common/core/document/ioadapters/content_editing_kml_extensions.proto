@@ -1,0 +1,92 @@
+syntax = "proto2";
+
+package earth.document.protos;
+
+import "geo/earth/app/common/core/document/ioadapters/content_editing_model.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.earth.core.document";
+
+message EditingModelExtension {
+    oneof NodeType {
+        DocumentExtension document_extension = 1;
+        StyleSelectorExtension style_selector_extension = 2;
+        FeatureExtension feature_extension = 3;
+        GxImageExtension gx_image_extension = 4;
+    }
+}
+
+message DocumentExtension {
+    optional EditingModelVersion model_version = 2;
+    optional ContentStyle content_style = 1;
+}
+
+message EditingModelVersion {
+    optional int32 major_version = 1 [default = 0];
+    optional int32 minor_version = 2 [default = 0];
+}
+
+message ContentStyle {
+    optional ContentStyleOptions style_options = 1;
+    repeated IndividualStyleRule individual_style_rule = 2;
+}
+
+message ContentStyleOptions {
+    optional StyleType style_type = 1;
+    optional IndividualStyleOptions individual_options = 2;
+}
+
+message IndividualStyleRule {
+    optional string feature_id = 1;
+    optional FeatureStyle feature_style = 2;
+}
+
+message IndividualStyleOptions {
+    optional FeatureStyle default_feature_style = 1;
+}
+
+message StyleSelectorExtension {
+    optional StyleMapExtension style_map_extension = 1;
+    optional StyleExtension style_extension = 2;
+    optional bool is_materialized_style = 3;
+    optional GxCascadingStyleExtension gx_cascading_style_extension = 4;
+}
+
+message GxCascadingStyleExtension {
+    repeated MaterializedStyleLayer materialized_style_layer = 1;
+}
+
+message MaterializedStyleLayer {
+    optional string url = 1;
+    
+    oneof MateralizedStyleLayerType {
+        BalloonTemplate balloon_template = 2;
+    }
+}
+
+message StyleMapExtension {
+    
+}
+
+message StyleExtension {
+    
+}
+
+message FeatureExtension {
+    optional PlacemarkExtension placemark_extension = 1;
+    optional FolderExtension folder_extension = 2;
+    optional bool has_managed_style = 3;
+}
+
+message PlacemarkExtension {
+    optional Geometry geometry = 1;
+}
+
+message FolderExtension {
+    
+}
+
+message GxImageExtension {
+    optional Media media = 1;
+}

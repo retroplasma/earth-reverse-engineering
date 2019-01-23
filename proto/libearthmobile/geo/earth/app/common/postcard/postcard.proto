@@ -1,0 +1,21 @@
+syntax = "proto2";
+
+package earth.postcard;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.postcard";
+
+message RawImage {
+    optional Type image_type = 1;
+    enum Type {
+        UNKNOWN_TYPE = 0;
+        PNG = 1;
+    }
+    
+    optional bytes data = 2;
+}
+
+message PostcardImage {
+    optional RawImage image = 1;
+}

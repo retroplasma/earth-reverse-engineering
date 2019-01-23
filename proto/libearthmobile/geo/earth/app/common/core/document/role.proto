@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package earth.document;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.document";
+
+enum Role {
+    ROLE_UNKNOWN = 0;
+    ROLE_REGULAR_DOCUMENT = 1;
+    ROLE_DEFAULT_DOCUMENT = 2;
+}

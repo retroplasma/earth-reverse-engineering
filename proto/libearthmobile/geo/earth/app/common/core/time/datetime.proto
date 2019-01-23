@@ -1,0 +1,23 @@
+syntax = "proto2";
+
+package earth.time;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.time";
+
+message DateTime {
+    optional double posix_time = 1;
+    optional int64 year = 2;
+    optional uint32 month = 3;
+    optional uint32 day = 4;
+    optional uint32 hour = 5;
+    optional uint32 minute = 6;
+    optional uint32 second = 7;
+    optional uint32 nanosecond = 8;
+    optional string iso_date_format = 9;
+}
+
+message DateTimeList {
+    repeated DateTime datetimes = 1;
+}

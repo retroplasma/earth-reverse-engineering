@@ -1,0 +1,52 @@
+syntax = "proto2";
+
+package earth.layers;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.geo.earth.app.common.layers";
+
+message MapStyle {
+    optional Projection projection = 1 [default = PROJECTION_GLOBE];
+    enum Projection {
+        PROJECTION_UNKNOWN = 0;
+        PROJECTION_GLOBE = 1;
+        PROJECTION_MERCATOR = 2;
+    }
+    
+    optional Imagery imagery = 2 [default = IMAGERY_SATELLITE];
+    enum Imagery {
+        IMAGERY_UNKNOWN = 0;
+        IMAGERY_SATELLITE = 1;
+        IMAGERY_NORMAL_ROADMAP = 2;
+        IMAGERY_TERRAIN = 3;
+    }
+    
+    optional ThreeDFeatures three_d_features = 3 [default = THREE_D_ALL];
+    enum ThreeDFeatures {
+        THREE_D_UNKNOWN = 0;
+        THREE_D_ALL = 1;
+        THREE_D_TERRAIN_ONLY = 2;
+        THREE_D_NONE = 3;
+    }
+    
+    optional bool show_atmosphere = 4 [default = true];
+    optional bool show_clouds = 5 [default = true];
+    
+    optional BaseLayers base_layers = 6;
+    message BaseLayers {
+        optional Preset preset = 2;
+        enum Preset {
+            UNKNOWN = 0;
+            CUSTOM = 1;
+            CLEAN = 2;
+            EXPLORATION = 3;
+            EVERYTHING = 4;
+        }
+        
+        repeated uint32 custom_feature_category = 1;
+    }
+    
+    optional bool show_discovery_layer = 7 [default = false];
+    optional bool use_animated_clouds = 8 [default = false];
+}

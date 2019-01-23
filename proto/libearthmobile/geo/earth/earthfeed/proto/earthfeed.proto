@@ -1,0 +1,171 @@
+syntax = "proto2";
+
+package earthfeed;
+
+import "geo/earth/app/common/core/layers/mapstyle.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.geo.earth.feed";
+
+message EarthFeedPublishMetadata {
+    optional int32 publish_time = 3;
+}
+
+message EarthFeedList {
+    repeated EarthFeed localized_earth_feeds = 1;
+}
+
+message EarthFeed {
+    optional string title = 1;
+    optional string description = 2;
+    repeated EarthFeedCategory categories = 3;
+    optional string locale = 4;
+}
+
+message EarthFeedCategory {
+    optional string title = 1;
+    optional string description = 2;
+    repeated EarthFeedItem items = 3;
+    optional string guid = 4;
+    
+    optional DisplayType display_type = 5;
+    enum DisplayType {
+        DISPLAY_TYPE_UNSPECIFIED = 0;
+        CAROUSEL = 1;
+        FEATURED = 2;
+        GLOBAL_AWARENESS = 5;
+        HISTORY = 6;
+        IMAGERY = 7;
+        TRAVEL = 8;
+        NATURE = 9;
+        CULTURE = 10;
+        EDUCATION = 11;
+        SPORTS = 12;
+        LIBRARY = 13;
+        LAYERS = 14;
+        EVERYTHING = 3 [deprecated = true];
+        TAG = 4 [deprecated = true];
+    }
+}
+
+message Image {
+    optional int32 width = 2;
+    optional int32 height = 3;
+    optional string fife_url = 4;
+}
+
+message EarthLayerId {
+    optional string layer_id = 1;
+    
+    optional EarthLayerCategory earth_layer_category = 2;
+    enum EarthLayerCategory {
+        BASE_LAYER = 0;
+    }
+    
+    repeated int32 sublayer_id = 3;
+}
+
+message ItemAction {
+    optional string target_feature_id = 1;
+    optional bool play_tour = 2;
+    optional bool show_balloon = 3;
+    optional bool fly_to_feature = 4;
+    
+    optional Trajectory trajectory = 5;
+    enum Trajectory {
+        PARABOLIC = 0;
+        TELEPORT = 1;
+        CONTEXTUAL = 2;
+    }
+    
+    optional PresentationMode presentation_mode = 6;
+    enum PresentationMode {
+        STATIC = 0;
+        ORBIT = 1;
+        CINEMATIC = 2;
+    }
+    
+    repeated EarthLayerId layers_to_enable = 7;
+    optional .earth.layers.MapStyle map_style = 8;
+}
+
+message SpecialFeature {
+    optional string kml_feature_id = 1;
+    
+    repeated SpecialFeatureType special_feature_type = 2;
+    enum SpecialFeatureType {
+        SPECIAL_FEATURE_TYPE_UNSPECIFIED = 0;
+        TABLE_OF_CONTENTS = 1;
+    }
+}
+
+message EarthFeedItem {
+    optional string title = 1;
+    optional string description = 2;
+    repeated Image images = 3;
+    optional string content_url = 4;
+    optional ItemAction item_action = 15;
+    optional string guid = 6;
+    
+    repeated Tag tags = 8;
+    enum Tag {
+        TAG_UNSPECIFIED = 0;
+        GLOBAL_AWARENESS = 1;
+        HISTORY = 2;
+        IMAGERY = 3;
+        TRAVEL = 4;
+        NATURE = 5;
+        CULTURE = 6;
+        EDUCATION = 7;
+        SPORTS = 8;
+        LIBRARY = 9;
+        LAYERS = 10;
+    }
+    
+    optional string content_url_to_save = 9;
+    optional int64 last_updated = 10;
+    optional string snippet = 11;
+    optional string logo_url = 12;
+    
+    optional Badge badge = 13;
+    enum Badge {
+        BADGE_UNSPECIFIED = 0;
+        LINEAR_STORY = 1;
+        INTERACTIVE_STORY = 2;
+        COLLECTION = 3;
+        VISUALIZATION = 4;
+    }
+    
+    repeated SpecialFeature special_features = 16;
+    optional string content_hash = 17;
+    optional int64 first_published_time = 18;
+    
+    repeated Action actions = 5 [deprecated = true];
+    enum Action {
+        ACTION_UNSPECIFIED = 0;
+        FLY_TO_BOUNDING_VIEW = 1;
+        PLAY_TOUR = 2;
+        SHOW_DOCUMENT_BALLOON = 3;
+    }
+    
+    optional string target_feature_id = 7 [deprecated = true];
+    
+    optional AspectRatioForGrid aspect_ratio = 14 [deprecated = true];
+    enum AspectRatioForGrid {
+        ASPECT_RATIO_FOR_GRID_UNSPECIFIED = 0;
+        ONE_TO_ONE = 1;
+        TWO_TO_ONE = 2;
+    }
+    
+    enum ContentType {
+        CONTENT_TYPE_UNSPECIFIED = 0;
+        KML = 1;
+    }
+}
+
+message EarthFeedEventLog {
+    optional int32 type = 1;
+    optional string item_guid = 2;
+    optional string feature_id = 3;
+}

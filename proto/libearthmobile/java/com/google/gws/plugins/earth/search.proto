@@ -1,0 +1,103 @@
+syntax = "proto2";
+
+package earth;
+
+import "java/com/google/gws/plugins/earth/directions.proto";
+import "java/com/google/gws/plugins/earth/geometry.proto";
+import "java/com/google/gws/plugins/earth/string-camera.proto";
+
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "EarthSearch";
+option java_package = "com.google.earth";
+
+message Rating {
+    optional LoggedLink review_count = 4;
+    optional float num_rating_stars = 8;
+}
+
+message PhotoThumbnail {
+    optional string url = 1;
+    optional string label = 2;
+    optional Size actual_size = 3;
+    optional Size render_size = 4;
+}
+
+message PhotoDescription {
+    optional string title = 4;
+    optional PhotoThumbnail thumbnail = 7;
+}
+
+message CoverPhoto {
+    repeated PhotoDescription photo = 1;
+    optional bool is_low_quality_photo = 2;
+}
+
+message PhotoDescriptionSet {
+    repeated PhotoDescription photo = 1;
+}
+
+message SummaryQuote {
+    optional string text = 2;
+}
+
+message EditorialSummaries {
+    optional SummaryQuote short_summary = 1;
+    optional SummaryQuote medium_summary = 2;
+}
+
+message PlusPageInfo {
+    optional string obfuscated_gaia_id = 3;
+}
+
+message PlaceCard {
+    optional LatLng lat_lng = 10;
+    optional string feature_id = 11;
+    optional string title = 12;
+    optional LatLngRectangle rectangle = 13;
+    repeated string address_line = 3;
+    optional string single_line_address = 40;
+    optional string name_and_address = 19;
+    repeated string phone_number = 4;
+    optional Rating rating = 5;
+    optional LoggedLink authority_page_link = 8;
+    optional bool is_geocode = 18 [default = false];
+    optional EditorialSummaries editorial_summaries = 33;
+    optional PhotoDescriptionSet photo_entrypoint_set = 38;
+    optional CoverPhoto cover_photo = 73;
+    optional bool is_service_area_business = 41 [default = false];
+    optional PlusPageInfo plus_page_info = 58;
+    optional string machine_id = 90;
+}
+
+message NoOrganicResultsCard {
+    
+}
+
+message OmniboxEntry {
+    optional NoOrganicResultsCard no_organic_results_card = 19;
+    optional PlaceCard place_card = 15;
+    optional DirectionsCard directions_card = 5;
+    optional MultiDidYouMeanCard multi_did_you_mean_card = 16;
+}
+
+message OmniboxContent {
+    optional string canonical_query = 1;
+    repeated OmniboxEntry omnibox_entry = 2;
+    optional bool more_place_cards_available = 4 [default = true];
+}
+
+message DidYouMeanResult {
+    optional string name = 1;
+}
+
+message MultiDidYouMeanCard {
+    repeated DidYouMeanResult result = 1;
+    optional string query_what = 2;
+}
+
+message SearchResponse {
+    optional OmniboxContent omnibox_content = 1;
+    optional StringCamera camera = 2;
+    repeated RequestParameter request_parameter = 5;
+    optional string debug_html = 6;
+}

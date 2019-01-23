@@ -1,0 +1,35 @@
+syntax = "proto2";
+
+package earth.document;
+
+import "geo/earth/app/common/core/document/role.proto";
+import "geo/earth/app/common/core/document/icon.proto";
+
+option optimize_for = CODE_SIZE;
+
+message DocumentUmsMetadata {
+    optional string map_id = 1;
+}
+
+message DocumentStorageMetadata {
+    optional bool visibility = 1;
+    optional string title = 2;
+    optional string snippet = 3;
+    optional string description = 4;
+    
+    optional Origin origin = 5;
+    enum Origin {
+        ORIGIN_UNKNOWN = 0;
+        ORIGIN_NONE = 1;
+        ORIGIN_LOCAL = 2;
+        ORIGIN_UMS = 3;
+    }
+    
+    optional string url = 6;
+    optional string base_url = 7;
+    optional Icon icon = 8;
+    optional Role role = 9;
+    optional DocumentUmsMetadata ums_metadata = 10;
+    optional int64 document_key = 11;
+    optional int64 last_modified_timestamp_milliseconds = 12;
+}

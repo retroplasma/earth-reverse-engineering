@@ -1,0 +1,193 @@
+syntax = "proto2";
+
+package earth.document.protos;
+
+import "geo/earth/app/common/core/document/ioadapters/content_editing_mutations.proto";
+import "geo/earth/app/common/core/document/ioadapters/content_editing_model.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.earth.core.document";
+
+message ErrorWrapper {
+    optional string data = 4;
+}
+
+message ErrorResponse {
+    optional ErrorId error_id = 1;
+    enum ErrorId {
+        UNKNOWN_ERROR_ID = 0;
+        INTERNAL_ERROR = 1;
+        NOT_FOUND = 2;
+        PERMISSION_DENIED = 3;
+        INVALID_GEOMETRY_IN_S2 = 4;
+        MAX_LAYERS_REACHED = 5;
+    }
+    
+    optional bool is_retryable = 2;
+    optional string message = 3;
+}
+
+message CreateMapRequest {
+    optional string map_title = 1;
+    optional string map_description = 2;
+    optional string drive_folder_id = 3;
+}
+
+message CreateMapResponse {
+    optional string map_id = 1;
+}
+
+message GetMapRequest {
+    optional string map_id = 1;
+    optional int64 if_modified_since_timestamp_milliseconds = 2;
+}
+
+message GetMapResponse {
+    optional string kml_data = 1;
+    optional int64 last_modified_timestamp_milliseconds = 2;
+    optional AccessInfo access_info = 3;
+}
+
+message AuthorizationInfo {
+    repeated Role user_role = 1;
+    enum Role {
+        UNKNOWN_ROLE = 0;
+        PEEKER = 1;
+        READER = 2;
+        WRITER = 3;
+        OWNER = 4;
+        APPENDER = 5;
+        COMMENTER = 6;
+        EXECUTER = 7;
+        RESPONDER = 8;
+        MODERATOR = 9;
+        ORGANIZER = 10;
+    }
+}
+
+message AccessInfo {
+    optional AuthorizationInfo authorization_info = 1;
+    optional bool is_public = 2;
+    optional bool is_listed = 3;
+}
+
+message DataTransactionOptions {
+    optional bool begin_data_transaction = 1;
+    optional bool end_data_transaction = 3;
+    optional bytes data_transaction_token = 4;
+    optional bool level_2 = 5;
+}
+
+message MutateMapRequest {
+    optional string map_id = 1;
+    optional DataTransactionOptions data_transaction_options = 4;
+    
+    oneof MutationSetType {
+        DataMutationSet data_mutation_set = 2;
+        MetadataMutationSet metadata_mutation_set = 3;
+    }
+}
+
+message MutateMapResponse {
+    optional bytes data_transaction_token = 1;
+}
+
+message DeleteMapRequest {
+    optional string map_id = 1;
+}
+
+message DeleteMapResponse {
+    
+}
+
+message GetUserMapListRequest {
+    optional FilterType filter_type = 1 [default = ALL_MAPS];
+    enum FilterType {
+        UNKNOWN_FILTER_TYPE = 0;
+        ALL_MAPS = 1;
+        MAPS_OWNED_BY_USER = 2;
+        MAPS_NOT_OWNED_BY_USER = 3;
+        MAPS_SHARED_WITH_USER = 4;
+        MAPS_VISITED_BY_USER = 5;
+        MAPS_STARRED_BY_USER = 6;
+    }
+    
+    optional string continuation_token = 2;
+    optional int32 items_per_request = 3 [default = 100];
+    
+    optional SortKey sort_key = 4 [default = LAST_ACCESSED_BY_USER_TIME];
+    enum SortKey {
+        UNKNOWN_SORT_KEY = 0;
+        LAST_ACCESSED_BY_USER_TIME = 1;
+        LAST_ACCESSED_OR_STARRED_BY_USER_TIME = 2;
+        LAST_MODIFIED_TIME = 3;
+        LAST_MODIFIED_BY_USER_TIME = 4;
+        TITLE = 5;
+        SHARE_TIME = 6;
+    }
+}
+
+message GetUserMapListResponse {
+    repeated MapListItem item = 1;
+    optional string continuation_token = 2;
+}
+
+message MapListItem {
+    optional string id = 1;
+    optional string title = 2;
+    optional string description = 3;
+    optional int64 created_time_millis = 4;
+    optional int64 last_modified_time_millis = 5;
+    optional int64 last_modified_by_me_time_millis = 6;
+    optional int64 last_access_time_millis = 7;
+    optional int64 share_time_millis = 8;
+    optional bool is_starred = 9;
+    optional bool is_public = 10;
+    optional bool can_edit = 11;
+    optional bool can_delete = 12;
+    
+    optional SharingType sharing_type = 13 [default = UNKNOWN_SHARING_TYPE];
+    enum SharingType {
+        UNKNOWN_SHARING_TYPE = 0;
+        OWNED_BY_USER = 1;
+        SHARED_WITH_USER = 2;
+        PUBLIC = 3;
+    }
+    
+    optional string thumbnail_url_template = 14;
+}
+
+message GetImageDataRequest {
+    optional string image_url = 1;
+}
+
+message GetImageDataResponse {
+    optional bytes image_data = 1;
+}
+
+message HostedImage {
+    oneof HostedImageType {
+        string url = 1;
+        bytes image_data = 2;
+    }
+}
+
+message CreateHostedImageRequest {
+    optional string map_id = 1;
+    optional HostedImage hosted_image = 2;
+    optional string feature_id = 4;
+}
+
+message CreateHostedImageResponse {
+    optional Media media = 1;
+}
+
+message GetUserRequest {
+    
+}
+
+message GetUserResponse {
+    optional string focus_obfuscated_gaia_id = 1;
+    optional string session_identifier = 2;
+}

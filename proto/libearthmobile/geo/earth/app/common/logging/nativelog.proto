@@ -1,0 +1,46 @@
+syntax = "proto2";
+
+package earth.logging;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.logging";
+
+message NativeLog {
+    optional RenderingStats rendering_stats = 1;
+    message RenderingStats {
+        optional double average_fps = 1;
+        optional double time_to_first_scene = 3;
+        optional int32 frames_rendered = 4;
+        optional int32 jank60_frame_count = 5;
+        optional int32 jank30_frame_count = 6;
+        optional int32 jank30_frame_percent = 7;
+        optional int32 jank60_frame_percent = 8;
+    }
+    
+    optional MemoryStats memory_stats = 2;
+    message MemoryStats {
+        optional double total_allocator_memory = 1;
+        optional double total_allocator_gpu_memory = 2;
+    }
+    
+    optional NetworkStats network_stats = 3;
+    message NetworkStats {
+        optional int32 http_requests = 1;
+        optional int32 http_bytes_sent = 2;
+        optional int32 http_bytes_received = 3;
+    }
+    
+    optional MirthSessionStats session_stats = 4;
+    message MirthSessionStats {
+        optional double mirth_time_to_first_frame = 1;
+    }
+}
+
+message NativeProperties {
+    optional Graphics graphics = 1;
+    message Graphics {
+        optional string driver = 1;
+        optional string hardware = 2;
+    }
+}

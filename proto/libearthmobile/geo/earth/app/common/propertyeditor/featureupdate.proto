@@ -1,0 +1,595 @@
+syntax = "proto2";
+
+package earth.propertyeditor;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.propertyeditor";
+
+message Color {
+    optional uint32 red = 1;
+    optional uint32 green = 2;
+    optional uint32 blue = 3;
+}
+
+message Coordinate {
+    optional double latitude = 1;
+    optional double longitude = 2;
+    optional double altitude = 3;
+    optional AltitudeMode altitude_mode = 4;
+}
+
+message CoordinateUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            LATITUDE = 1;
+            LONGITUDE = 2;
+            ALTITUDE = 3;
+            ALTITUDE_MODE = 4;
+        }
+    }
+    
+    optional double latitude = 2;
+    optional double longitude = 3;
+    optional double altitude = 4;
+    optional AltitudeMode altitude_mode = 5;
+}
+
+message LookAt {
+    optional double latitude = 1;
+    optional double longitude = 2;
+    optional double altitude = 3;
+    optional AltitudeMode altitude_mode = 4;
+    optional double heading = 5;
+    optional double tilt = 6;
+    optional double range = 7;
+}
+
+message LookAtUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            LATITUDE = 1;
+            LONGITUDE = 2;
+            ALTITUDE = 3;
+            ALTITUDE_MODE = 4;
+            HEADING = 5;
+            TILT = 6;
+            RANGE = 7;
+        }
+    }
+    
+    optional double latitude = 2;
+    optional double longitude = 3;
+    optional double altitude = 4;
+    optional AltitudeMode altitude_mode = 5;
+    optional double heading = 6;
+    optional double tilt = 7;
+    optional double range = 8;
+}
+
+message VertexList {
+    repeated Coordinate vertices = 1;
+}
+
+message VertexListUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            VERTICES = 1;
+            SPLICES = 2;
+        }
+    }
+    
+    repeated Coordinate vertices = 2;
+    
+    optional CoordinateSplices splices = 3;
+    message CoordinateSplices {
+        repeated Replacement replacements = 1;
+        message Replacement {
+            optional uint32 index = 1;
+            optional Coordinate value = 2;
+        }
+        
+        repeated Update updates = 2;
+        message Update {
+            optional uint32 index = 1;
+            optional CoordinateUpdate value = 2;
+        }
+        
+        repeated Removal removals = 3;
+        message Removal {
+            optional uint32 index = 1;
+        }
+        
+        repeated Insertion insertions = 4;
+        message Insertion {
+            optional uint32 insert_before = 1;
+            optional Coordinate value = 2;
+        }
+    }
+}
+
+message Polygon {
+    repeated VertexList rings = 1;
+}
+
+message PolygonUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            RINGS = 1;
+            SPLICES = 2;
+        }
+    }
+    
+    repeated VertexList rings = 2;
+    
+    optional VertexListSplices splices = 3;
+    message VertexListSplices {
+        repeated Replacement replacements = 1;
+        message Replacement {
+            optional uint32 index = 1;
+            optional VertexList value = 2;
+        }
+        
+        repeated Update updates = 2;
+        message Update {
+            optional uint32 index = 1;
+            optional VertexListUpdate value = 2;
+        }
+        
+        repeated Removal removals = 3;
+        message Removal {
+            optional uint32 index = 1;
+        }
+        
+        repeated Insertion insertions = 4;
+        message Insertion {
+            optional uint32 insert_before = 1;
+            optional VertexList value = 2;
+        }
+    }
+}
+
+message Geometry {
+    oneof type {
+        Coordinate point = 1;
+        VertexList line_string = 2;
+        Polygon polygon = 3;
+    }
+}
+
+message GeometryUpdate {
+    oneof type {
+        CoordinateUpdate point = 1;
+        VertexListUpdate line_string = 2;
+        PolygonUpdate polygon = 3;
+    }
+}
+
+message IconStyle {
+    optional Color color = 3;
+    optional int32 hotspot_x = 4;
+    optional int32 hotspot_y = 5;
+    optional double render_scale = 6;
+    
+    oneof type {
+        int32 stock_icon_id = 1;
+        bytes custom_icon_bytes = 2;
+    }
+}
+
+message IconStyleUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            STOCK_ICON_ID = 1;
+            CUSTOM_ICON_BYTES = 2;
+            COLOR = 3;
+            HOTSPOT_X = 4;
+            HOTSPOT_Y = 5;
+            RENDER_SCALE = 6;
+        }
+    }
+    
+    optional int32 stock_icon_id = 2;
+    optional bytes custom_icon_bytes = 3;
+    optional Color color = 4;
+    optional int32 hotspot_x = 5;
+    optional int32 hotspot_y = 6;
+    optional double render_scale = 7;
+}
+
+message LabelStyle {
+    optional bool visible = 1;
+    optional Color color = 2;
+    optional double render_scale = 3;
+}
+
+message LabelStyleUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            VISIBLE = 1;
+            COLOR = 2;
+            RENDER_SCALE = 3;
+        }
+    }
+    
+    optional bool visible = 2;
+    optional Color color = 3;
+    optional double render_scale = 4;
+}
+
+message LineStyle {
+    optional Color color = 1;
+    optional uint32 opacity = 2;
+    optional int32 width = 3;
+}
+
+message LineStyleUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            COLOR = 1;
+            OPACITY = 2;
+            WIDTH = 3;
+        }
+    }
+    
+    optional Color color = 2;
+    optional uint32 opacity = 3;
+    optional double width = 4;
+}
+
+message PolygonStyle {
+    optional Color fill_color = 1;
+    optional uint32 fill_opacity = 2;
+    optional Color stroke_color = 3;
+    optional uint32 stroke_opacity = 4;
+    optional int32 stroke_width = 5;
+}
+
+message PolygonStyleUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            FILL_COLOR = 1;
+            FILL_OPACITY = 2;
+            STROKE_COLOR = 3;
+            STROKE_OPACITY = 4;
+            STROKE_WIDTH = 5;
+        }
+    }
+    
+    optional Color fill_color = 2;
+    optional uint32 fill_opacity = 3;
+    optional Color stroke_color = 4;
+    optional uint32 stroke_opacity = 5;
+    optional int32 stroke_width = 6;
+}
+
+message HtmlContent {
+    optional string html = 1;
+}
+
+message TemplateContent {
+    optional string template_id = 1;
+}
+
+message BalloonStyle {
+    optional PanelType panel_type = 1;
+    
+    oneof content {
+        HtmlContent html_content = 2;
+        TemplateContent template_content = 3;
+    }
+}
+
+message BalloonStyleUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            PANEL_TYPE = 1;
+            HTML_CONTENT = 2;
+            TEMPLATE_CONTENT = 3;
+        }
+    }
+    
+    optional PanelType panel_type = 2;
+    
+    oneof content {
+        HtmlContent html_content = 3;
+        TemplateContent template_content = 4;
+    }
+}
+
+message Style {
+    optional IconStyle icon_style = 1;
+    optional LabelStyle label_style = 2;
+    optional LineStyle line_style = 3;
+    optional PolygonStyle polygon_style = 4;
+    optional BalloonStyle balloon_style = 5;
+}
+
+message StyleUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            ICON_STYLE = 1;
+            ICON_STYLE_UPDATE = 2;
+            LABEL_STYLE = 3;
+            LABEL_STYLE_UPDATE = 4;
+            LINE_STYLE = 5;
+            LINE_STYLE_UPDATE = 6;
+            POLYGON_STYLE = 7;
+            POLYGON_STYLE_UPDATE = 8;
+            BALLOON_STYLE = 9;
+            BALLOON_STYLE_UPDATE = 10;
+        }
+    }
+    
+    optional IconStyle icon_style = 2;
+    optional IconStyleUpdate icon_style_update = 3;
+    optional LabelStyle label_style = 4;
+    optional LabelStyleUpdate label_style_update = 5;
+    optional LineStyle line_style = 6;
+    optional LineStyleUpdate line_style_update = 7;
+    optional PolygonStyle polygon_style = 8;
+    optional PolygonStyleUpdate polygon_style_update = 9;
+    optional BalloonStyle balloon_style = 10;
+    optional BalloonStyleUpdate balloon_style_update = 11;
+}
+
+message Attribute {
+    optional string id = 1;
+    optional string display_name = 2;
+    optional string template_alias = 3;
+    optional string template_default = 4;
+    optional AttributeType type = 5;
+    
+    oneof value_type {
+        string string_value = 6;
+        int32 integer_value = 7;
+    }
+}
+
+message AttributeUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            TEMPLATE_ALIAS = 1;
+            TYPE = 2;
+            STRING_VALUE = 3;
+            INTEGER_VALUE = 4;
+        }
+    }
+    
+    optional string id = 2;
+    optional string display_name = 3;
+    optional string template_alias = 4;
+    optional string template_default = 5;
+    optional AttributeType type = 6;
+    
+    oneof value_type {
+        string string_value = 7;
+        int32 integer_value = 8;
+    }
+}
+
+message Media {
+    oneof source {
+        string token = 1;
+        string url = 2;
+    }
+}
+
+message MediaUpdate {
+    optional Mask mask = 1;
+    message Mask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            TOKEN = 1;
+            URL = 2;
+        }
+    }
+    
+    oneof source {
+        string token = 2;
+        string url = 3;
+    }
+}
+
+message Feature {
+    optional Type type = 1;
+    optional bool visible = 2;
+    optional string name = 3;
+    optional string description = 4;
+    optional string snippet = 5;
+    optional LookAt look_at = 6;
+    repeated Geometry geometry = 7;
+    optional Style style = 8;
+    repeated Attribute attributes = 9;
+    repeated Media media = 10;
+}
+
+message FeatureUpdate {
+    optional FeatureUpdateMask mask = 1;
+    message FeatureUpdateMask {
+        repeated Field fields = 1;
+        enum Field {
+            UNKNOWN_FIELD = 0;
+            TYPE = 1;
+            VISIBLE = 2;
+            NAME = 3;
+            DESCRIPTION = 4;
+            SNIPPET = 5;
+            LOOK_AT = 6;
+            LOOK_AT_UPDATE = 7;
+            GEOMETRIES = 8;
+            GEOMETRY_SPLICES = 9;
+            STYLE = 10;
+            STYLE_UPDATE = 11;
+            ATTRIBUTES = 12;
+            ATTRIBUTE_SPLICES = 13;
+            MEDIA = 14;
+            MEDIA_SPLICES = 15;
+        }
+    }
+    
+    optional Type type = 2;
+    optional bool visible = 3;
+    optional string name = 4;
+    optional string description = 5;
+    optional string snippet = 6;
+    optional LookAt look_at = 7;
+    optional LookAtUpdate look_at_update = 8;
+    repeated Geometry geometries = 9;
+    
+    optional GeometrySplices geometry_splices = 10;
+    message GeometrySplices {
+        repeated Replacement replacements = 1;
+        message Replacement {
+            optional uint32 index = 1;
+            optional Geometry value = 2;
+        }
+        
+        repeated Update updates = 2;
+        message Update {
+            optional uint32 index = 1;
+            optional GeometryUpdate value = 2;
+        }
+        
+        repeated Removal removals = 3;
+        message Removal {
+            optional uint32 index = 1;
+        }
+        
+        repeated Insertion insertions = 4;
+        message Insertion {
+            optional uint32 insert_before = 1;
+            optional Geometry value = 2;
+        }
+    }
+    
+    optional Style style = 11;
+    optional StyleUpdate style_update = 12;
+    repeated Attribute attributes = 13;
+    
+    optional AttributeSplices attribute_splices = 14;
+    message AttributeSplices {
+        repeated Replacement replacements = 1;
+        message Replacement {
+            optional uint32 index = 1;
+            optional Attribute value = 2;
+        }
+        
+        repeated Update updates = 2;
+        message Update {
+            optional uint32 index = 1;
+            optional AttributeUpdate value = 2;
+        }
+        
+        repeated Removal removals = 3;
+        message Removal {
+            optional uint32 index = 1;
+        }
+        
+        repeated Insertion insertions = 4;
+        message Insertion {
+            optional uint32 insert_before = 1;
+            optional Attribute value = 2;
+        }
+    }
+    
+    repeated Media media = 15;
+    
+    optional MediaSplices media_splices = 16;
+    message MediaSplices {
+        repeated Replacement replacements = 1;
+        message Replacement {
+            optional uint32 index = 1;
+            optional Media value = 2;
+        }
+        
+        repeated Update updates = 2;
+        message Update {
+            optional uint32 index = 1;
+            optional MediaUpdate value = 2;
+        }
+        
+        repeated Removal removals = 3;
+        message Removal {
+            optional uint32 index = 1;
+        }
+        
+        repeated Insertion insertions = 4;
+        message Insertion {
+            optional uint32 insert_before = 1;
+            optional Media value = 2;
+        }
+    }
+}
+
+enum Type {
+    UNKNOWN_TYPE = 0;
+    STORY = 1;
+    DOCUMENT = 2;
+    SCENE = 3;
+    FOLDER = 4;
+    VIEW = 5;
+    PANEL = 6;
+    POINT = 7;
+    PATH = 8;
+    POLYGON = 9;
+    MULTI_GEOMETRY = 10;
+}
+
+enum AltitudeMode {
+    UNKNOWN_ALTITUDE_MODE = 0;
+    ABSOLUTE = 1;
+    CLAMP_TO_GROUND = 2;
+    CLAMP_TO_SEA_FLOOR = 3;
+    RELATIVE_TO_GROUND = 4;
+    RELATIVE_TO_SEA_FLOOR = 5;
+}
+
+enum PanelType {
+    UNKNOWN_PANEL_TYPE = 0;
+    PANEL_TYPE_NONE = 1;
+    PANEL_TYPE_POPUP_BALLOON = 2;
+    PANEL_TYPE_CARD = 3;
+    PANEL_TYPE_PANEL = 4;
+    PANEL_TYPE_FULLSCREEN = 5;
+}
+
+enum AttributeType {
+    UNKNOWN_ATTRIBUTE_TYPE = 0;
+    STRING = 1;
+    INTEGER = 2;
+}

@@ -1,0 +1,45 @@
+syntax = "proto2";
+
+package earth;
+
+option optimize_for = SPEED;
+
+message ExperimentFlag {
+    optional FlagName name = 1;
+    enum FlagName {
+        UNKNOWN_FLAG = 0;
+        TIMELAPSE_LAYERS_ENABLED = 2;
+        IMPORT_SHEET_ENABLED = 3;
+        USER_PHOTOS_ENABLED = 6;
+        CELESTIAL_BODIES_ENABLED = 8;
+        VOYAGER_SEARCH_SUGGESTIONS_ENABLED = 11;
+        TIMEMACHINE_ENABLED = 13;
+        VOYAGER_SUGGESTIONS_FROM_SERVER_ENABLED = 16;
+        THREE_D_IMAGERY_TOGGLE_ENABLED = 18;
+        CONTENT_CREATION_ENABLED = 20;
+        DISCOVERY_LAYER_ENABLED = 21;
+        STREET_VIEW_SLINGSHOT_ENABLED = 22;
+        UMS_NIGHTLY_ENABLED = 23;
+        NOTIFICATIONS_ENABLED = 24;
+        NOTIFICATIONS_ENROLLMENT_AFTER_FEELING_LUCKY_ENABLED = 25;
+        NOTIFICATIONS_ENROLLMENT_AFTER_VOYAGER_STORY_ENABLED = 26;
+        CLOUD_ANIMATION_TOGGLE_ENABLED = 27;
+        FLY_END_VIEW_ANIMATION_SETTING_ENABLED = 28;
+        MEASURE_TOOL_UNIT_SELECTION_ENABLED = 29;
+        MEASURE_TOOL_TOOLBAR_ENABLED = 30;
+        HATS_SURVEYS_ENABLED = 31;
+        MEASURE_TOOL_ENABLED = 5 [deprecated = true];
+        PEGMAN_DRAG_PAN_VIEW_ENABLED = 10 [deprecated = true];
+        PHOTOS_LAYER_ENABLED = 1 [deprecated = true];
+        SPOTLIGHT_AREAS_ENABLED = 9 [deprecated = true];
+        CINEMATIC_FLY_BUTTON_ENABLED = 4 [deprecated = true];
+        MAP_MODE_ENABLED = 7 [deprecated = true];
+        REPLACE_BASEMAP_LABEL_PINS = 12 [deprecated = true];
+        PROPERTY_EDITOR_ENABLED = 14 [deprecated = true];
+        UMS_DOCUMENTS_ENABLED = 15 [deprecated = true];
+        MY_PLACES_ATOMIC_VIEW_ENABLED = 19 [deprecated = true];
+        LOCATION_KNOWLEDGE_ENABLED = 17 [deprecated = true];
+    }
+    
+    optional bool value = 2 [default = false];
+}

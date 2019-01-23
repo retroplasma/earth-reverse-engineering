@@ -1,0 +1,48 @@
+syntax = "proto2";
+
+package earth.logging;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.logging";
+
+message SettingsLog {
+    optional bool flight_animation_enabled = 1;
+    
+    optional FlightAnimationSpeed flight_animation_speed = 2;
+    enum FlightAnimationSpeed {
+        FLIGHT_ANIMATION_UNKNOWN = 0;
+        FLIGHT_ANIMATION_SLOWEST = 1;
+        FLIGHT_ANIMATION_SLOWER = 2;
+        FLIGHT_ANIMATION_DEFAULT = 3;
+        FLIGHT_ANIMATION_FASTER = 4;
+        FLIGHT_ANIMATION_FASTEST = 5;
+    }
+    
+    optional MeasurementUnit measurement_unit = 3;
+    enum MeasurementUnit {
+        UNIT_UNKNOWN = 0;
+        UNIT_METERS_AND_KILOMETERS = 1;
+        UNIT_FEET_AND_MILES = 2;
+    }
+    
+    optional LatLonFormatting lat_lon_formatting = 4;
+    enum LatLonFormatting {
+        FORMAT_UNKNOWN = 0;
+        FORMAT_DEG_MIN_SEC = 1;
+        FORMAT_DECIMAL = 2;
+    }
+    
+    optional QualitySettings quality_settings = 5;
+    enum QualitySettings {
+        QUALITY_UNKNOWN = 0;
+        QUALITY_FASTEST = 1;
+        QUALITY_FASTER = 2;
+        QUALITY_DEFAULT = 3;
+        QUALITY_HIGH = 4;
+        QUALITY_HIGHEST = 5;
+    }
+    
+    optional bool voyager_notifications_enabled = 6;
+    optional bool poi_notifications_enabled = 7;
+}

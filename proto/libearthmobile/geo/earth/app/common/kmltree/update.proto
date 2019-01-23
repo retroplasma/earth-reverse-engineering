@@ -1,0 +1,84 @@
+syntax = "proto2";
+
+package earth.kmltree;
+
+import "geo/earth/app/common/core/document/capability.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.kmltree";
+
+message NodeUpdate {
+    optional int32 index = 1;
+    optional string key = 2;
+    optional string title = 3;
+    optional string snippet = 4;
+    
+    optional StandardIcon standard_icon = 5;
+    enum StandardIcon {
+        ICON_UNKNOWN = 0;
+        ICON_POINT = 1;
+        ICON_LINESTRING = 2;
+        ICON_POLYGON = 3;
+        ICON_MODEL = 4;
+        ICON_GROUNDOVERLAY = 5;
+        ICON_SCREENOVERLAY = 6;
+        ICON_PHOTOOVERLAY = 7;
+        ICON_FOLDER = 8;
+        ICON_DOCUMENT = 9;
+        ICON_NETWORKLINK = 10;
+        ICON_TRACK = 11;
+        ICON_MULTITRACK = 12;
+        ICON_TOUR = 13;
+        ICON_PANEL = 14;
+        ICON_VIEW = 15;
+        ICON_MULTIGEOMETRY = 16;
+    }
+    
+    optional string icon_url = 6;
+    
+    optional Visibility visibility = 7;
+    enum Visibility {
+        VISIBILITY_UNKNOWN = 0;
+        VISIBILITY_HIDDEN = 1;
+        VISIBILITY_SUPPRESSED = 2;
+        VISIBILITY_VISIBLE = 3;
+    }
+    
+    optional bool opened = 8;
+    optional int32 indentation = 9;
+    repeated .earth.document.Capability capability = 10;
+    
+    optional LinkState link_state = 11;
+    enum LinkState {
+        LINK_STATE_UNKNOWN = 0;
+        LINK_STATE_UNLOADED = 1;
+        LINK_STATE_LOADING = 2;
+        LINK_STATE_LOADED = 3;
+        LINK_STATE_ERROR = 4;
+    }
+    
+    optional bool is_overflow_proxy = 12;
+    optional int32 overflow_count = 13;
+    optional bool has_balloon = 14;
+}
+
+message RowUpdate {
+    optional Range range = 1;
+    message Range {
+        optional int32 first = 1;
+        optional int32 last = 2;
+    }
+    
+    optional Operation operation = 2;
+    enum Operation {
+        OPERATION_UNKNOWN = 0;
+        OPERATION_INSERT = 1;
+        OPERATION_DELETE = 2;
+    }
+}
+
+message Updates {
+    repeated RowUpdate row_update = 1;
+    repeated NodeUpdate node_update = 2;
+}

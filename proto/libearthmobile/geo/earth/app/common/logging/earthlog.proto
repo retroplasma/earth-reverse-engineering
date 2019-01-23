@@ -1,0 +1,26 @@
+syntax = "proto2";
+
+package earth.logging;
+
+import "geo/earth/app/common/logging/deeplinklog.proto";
+import "geo/earth/app/common/logging/earthfeedlog.proto";
+import "geo/earth/app/common/logging/settingslog.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.google.android.apps.earth.logging";
+
+message EarthLog {
+    optional Type type = 1;
+    enum Type {
+        UNKNOWN = 0;
+        SETTINGS_CHANGED = 120;
+        EARTH_FEED_ITEM_DEEP_LINK = 412;
+        DEEP_LINK_OPENED = 1006;
+        PLAY_MODE_PICK_PLACEMARK = 1360;
+    }
+    
+    optional EarthFeedLog earthfeed_log = 4;
+    optional DeeplinkLog deeplink_log = 19;
+    optional SettingsLog settings_log = 21;
+}
