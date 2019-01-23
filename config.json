@@ -1,0 +1,416 @@
+{
+    "experiment_flag": [
+    {
+        "name": "CELESTIAL_BODIES_ENABLED",
+        "value": false
+    },
+    {
+        "name": "CLOUD_ANIMATION_TOGGLE_ENABLED",
+        "value": false
+    },
+    {
+        "name": "CONTENT_CREATION_ENABLED",
+        "value": false
+    },
+    {
+        "name": "DISCOVERY_LAYER_ENABLED",
+        "value": false
+    },
+    {
+        "name": "FLY_END_VIEW_ANIMATION_SETTING_ENABLED",
+        "value": true
+    },
+    {
+        "name": "HATS_SURVEYS_ENABLED",
+        "value": false
+    },
+    {
+        "name": "MEASURE_TOOL_ENABLED",
+        "value": true
+    },
+    {
+        "name": "MEASURE_TOOL_UNIT_SELECTION_ENABLED",
+        "value": true
+    },
+    {
+        "name": "PEGMAN_DRAG_PAN_VIEW_ENABLED",
+        "value": true
+    },
+    {
+        "name": "PHOTOS_LAYER_ENABLED",
+        "value": true
+    },
+    {
+        "name": "RETURN_TO_VOYAGER_GRID_ENABLED",
+        "value": false
+    },
+    {
+        "name": "SPOTLIGHT_AREAS_ENABLED",
+        "value": true
+    },
+    {
+        "name": "STREET_VIEW_SLINGSHOT_ENABLED",
+        "value": false
+    },
+    {
+        "name": "THREE_D_IMAGERY_TOGGLE_ENABLED",
+        "value": true
+    },
+    {
+        "name": "TIMELAPSE_LAYERS_ENABLED",
+        "value": false
+    },
+    {
+        "name": "TYPE_TWO_SUGGESTIONS_ENABLED",
+        "value": true
+    },
+    {
+        "name": "UMS_NIGHTLY_ENABLED",
+        "value": false
+    },
+    {
+        "name": "USER_PHOTOS_ENABLED",
+        "value": false
+    },
+    {
+        "name": "VOYAGER_SEARCH_SUGGESTIONS_ENABLED",
+        "value": true
+    }],
+    "paint_parameters":
+    {
+        "data": ""
+    },
+    "celestial_body": [
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/mercury",
+        "id": "mercury",
+        "paintfe_layer_id": "14r435fVs-iaGieom9hnyFKzohpo",
+        "localized_name": "Mercury"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/venus",
+        "id": "venus",
+        "paintfe_layer_id": "1eJG0CUPwXrA45kRUXxewd-qHpBs",
+        "localized_name": "Venus"
+    },
+    {
+        "id": "earth",
+        "localized_name": "Earth"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/moon",
+        "id": "moon",
+        "paintfe_layer_id": "1V_p8jILbOyi7FRtWiMMZAQLRDEM",
+        "localized_name": "Moon"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/mars",
+        "id": "mars",
+        "paintfe_layer_id": "1NbHMI0JZs5noW147UemBLUPFlvo",
+        "localized_name": "Mars"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/ceres",
+        "id": "ceres",
+        "paintfe_layer_id": "1V2xxOB5xuTerhsMdUAU3J3vwQLA",
+        "localized_name": "Ceres"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/io",
+        "id": "io",
+        "paintfe_layer_id": "1KZsT-MghNXGo33uwedis9Ad-da0",
+        "localized_name": "Io"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/europa",
+        "id": "europa",
+        "paintfe_layer_id": "16fZ8gjlE8dmkTgVAaz2JTouRsqs",
+        "localized_name": "Europa"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/ganymede",
+        "id": "ganymede",
+        "paintfe_layer_id": "1S2rzrMvV8Igdq5e-81IjfaP1tt4",
+        "localized_name": "Ganymede"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/mimas",
+        "id": "mimas",
+        "paintfe_layer_id": "1M0JJSsgyiUKnjZWosOr8AxEjkz0",
+        "localized_name": "Mimas"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/enceladus",
+        "id": "enceladus",
+        "paintfe_layer_id": "122UiRkDQIxpzPnsG5gHuV-x6bkE",
+        "localized_name": "Enceladus"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/dione",
+        "id": "dione",
+        "paintfe_layer_id": "1SHbrZP7x1-G2yuwBReXBZp3geAw",
+        "localized_name": "Dione"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/rhea",
+        "id": "rhea",
+        "paintfe_layer_id": "1mDHm_Jn16uBtqoGRyafkin_8SWs",
+        "localized_name": "Rhea"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/titan",
+        "id": "titan",
+        "paintfe_layer_id": "13WLvGJYlo1HqmBGFhivImkeBmH4",
+        "localized_name": "Titan"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/iapetus",
+        "id": "iapetus",
+        "paintfe_layer_id": "1lS1pj2quSzgTCsjwQzgUUfZoXmU",
+        "localized_name": "Iapetus"
+    },
+    {
+        "rocktree_url": "https://kh.google.com/rt/he/pluto",
+        "id": "pluto",
+        "paintfe_layer_id": "12SXsTuEBJLpen7yejk8g3btFXKI",
+        "localized_name": "Pluto"
+    }],
+    "config_url": [
+    {
+        "name": "earth_gallery",
+        "uri": "https://maps.google.com/gallery/?clientcontext\u003d$[cc]\u0026hl\u003d$[hl]"
+    },
+    {
+        "name": "support",
+        "uri": "https://support.google.com/earth/answer/2516852?ref_topic\u003d4488238\u0026hl\u003d$[hl]"
+    },
+    {
+        "name": "privacy",
+        "uri": "https://www.google.com/intl/$[hl]/policies/privacy/"
+    },
+    {
+        "name": "tos",
+        "uri": "https://www.google.com/help/terms_maps.html"
+    },
+    {
+        "name": "legal_notices",
+        "uri": "https://www.google.com/help/legalnotices_maps.html"
+    },
+    {
+        "name": "geo_photo_metadata_url",
+        "uri": "https://www.google.com/maps/photometa/v1"
+    },
+    {
+        "name": "geo_photo_single_image_url",
+        "uri": "https://www.google.com/maps/photometa/si/v1"
+    },
+    {
+        "name": "geo_photo_area_connectivity_url",
+        "uri": "https://www.google.com/maps/photometa/ac/v1"
+    },
+    {
+        "name": "geo_photo_alleycat_url",
+        "uri": "https://geo0.ggpht.com/cbk"
+    },
+    {
+        "name": "geo_photo_fife_url",
+        "uri": "https://lh5.ggpht.com/"
+    },
+    {
+        "name": "knowledge_server",
+        "uri": "https://earth.google.com/earth/rpc/knowledge"
+    },
+    {
+        "name": "search_result_placemark_url",
+        "uri": "https://earth.google.com/clientassets/pin_search_128px.png"
+    },
+    {
+        "name": "current_search_result_placemark_url",
+        "uri": "https://earth.google.com/clientassets/pin_search_selected_128px.png"
+    },
+    {
+        "name": "knowledge_card_placemark_url",
+        "uri": "https://earth.google.com/clientassets/pin_search_128px.png"
+    },
+    {
+        "name": "current_knowledge_card_placemark_url",
+        "uri": "https://earth.google.com/clientassets/pin_search_selected_128px.png"
+    },
+    {
+        "name": "my_places_placemark_url",
+        "uri": "https://earth.google.com/clientassets/pin_myplaces_128px.png"
+    },
+    {
+        "name": "current_my_places_placemark_url",
+        "uri": "https://earth.google.com/clientassets/pin_myplaces_selected_128px.png"
+    },
+    {
+        "name": "mylocation_placemark_url",
+        "uri": "https://maps.gstatic.com/mapfiles/maps_lite/images/2x/ic_my_location_24dp.png"
+    },
+    {
+        "name": "earthfeed_url",
+        "uri": "https://earth.google.com/earth/rpc/feed"
+    },
+    {
+        "name": "panoramio_url",
+        "uri": "https://ssl.panoramio.com/photo"
+    },
+    {
+        "name": "panoramio_image_url",
+        "uri": "https://ssl.panoramio.com/photos/original/"
+    },
+    {
+        "name": "earth_photos_url",
+        "uri": "https://earth.google.com/earth/rpc/photos"
+    },
+    {
+        "name": "earthfeed_base_url_prefix",
+        "uri": "https://www.gstatic.com/earthfeed/content"
+    },
+    {
+        "name": "fdl_link_shortener_url",
+        "uri": "https://firebasedynamiclinks.googleapis.com/v1/shortLinks"
+    },
+    {
+        "name": "gme_server_url",
+        "uri": "https://earth.google.com/earth/rpc/gme/mapdetails"
+    },
+    {
+        "name": "satellite_raster_db_tile_path",
+        "uri": "https://khms0.googleapis.com/kh?v\u003d823\u0026hl\u003den-US\u0026x\u003d{{x}}\u0026y\u003d{{y}}\u0026z\u003d{{z}}"
+    },
+    {
+        "name": "animated_clouds_root_url",
+        "uri": "https://storage.googleapis.com/earth-animated-clouds/root.json"
+    },
+    {
+        "name": "ums_url",
+        "uri": "https://earth.google.com/earth/rpc/cc"
+    },
+    {
+        "name": "ums_nightly_url",
+        "uri": "https://earth.google.com/earth/rpc/cc/nightly"
+    },
+    {
+        "name": "drawing_placemark_url",
+        "uri": "https://earth.google.com/clientassets/drawing_128px.png"
+    },
+    {
+        "name": "drawing_placemark_highlight_url",
+        "uri": "https://earth.google.com/clientassets/drawing_highlight_128px.png"
+    },
+    {
+        "name": "drawing_placemark_midpoint_url",
+        "uri": "https://earth.google.com/clientassets/drawing_midpoint_128px.png"
+    },
+    {
+        "name": "drawing_placemark_phantom_url",
+        "uri": "https://earth.google.com/clientassets/drawing_phantom_128px.png"
+    },
+    {
+        "name": "measurement_help_url",
+        "uri": "https://support.google.com/earth/answer/9010337?hl\u003d$[hl]"
+    },
+    {
+        "name": "peopleservice",
+        "uri": "https://content-people-pa.googleapis.com"
+    },
+    {
+        "name": "pickerservice",
+        "uri": "https://docs.google.com/picker"
+    },
+    {
+        "name": "discovery_layer_kml",
+        "uri": "https://www.gstatic.com/earthfeed/discovery.en_default.kmz"
+    }],
+    "document":
+    {
+        "ums_max_concurrent_requests": 5,
+        "ums_max_requests_per_second": 4
+    },
+    "authentication_target":
+    {
+        "host": "earth.google.com",
+        "path_prefix": "/earth/rpc/"
+    },
+    "legal_country": "US",
+    "search": [
+    {
+        "server_name": "Google",
+        "entity_details_server": "https://earth.google.com/earth/rpc/entity",
+        "search_server": "https://earth.google.com/earth/rpc/search",
+        "suggest_server": "https://earth.google.com/earth/rpc/suggest"
+    }],
+    "database":
+    {
+        "layer_style_collapse_pois": false,
+        "rocktree_time_url": "https://kh.google.com/rt/tm/earth/",
+        "base_layer_style": [
+        {
+            "thumbnail_id": "clean",
+            "name": "Clean",
+            "description": "No borders, labels, places or roads."
+        },
+        {
+            "feature_type": [17, 18, 19, 34, 35, 36, 37, 38, 39, 40, 785, 1059, 5, 6, 61441, 61442],
+            "thumbnail_id": "exploration",
+            "default_selected": true,
+            "name": "Exploration",
+            "description": "Borders, labels, places and roads."
+        },
+        {
+            "feature_type": [0, 61441, 61442],
+            "thumbnail_id": "everything",
+            "name": "Everything",
+            "description": "All borders, labels, places, roads, transit, landmarks and water."
+        },
+        {
+            "feature_type": [17, 18, 19, 34, 35, 36, 37, 38, 39, 40, 785, 1059, 5, 6, 61441],
+            "editable": true,
+            "name": "Custom",
+            "description": "Choose your own look and feel."
+        }],
+        "raster_layer": [
+        {
+            "tile_path": "mirth-vfs://phototile/{{x}},{{y}},{{z}}",
+            "startup_name": "photos.pb",
+            "name": "Photos",
+            "default_visibility": false,
+            "id": "phototile"
+        }],
+        "paint_fe_layer": [
+        {
+            "name": "Roads \u0026 Labels",
+            "default_visibility": true,
+            "id": "m"
+        }],
+        "rocktree_url": "https://kh.google.com/rt/earth/",
+        "rocktree_hybrid_url": "https://kh.google.com/rt/he/earth/",
+        "paint_fe_server": "https://www.google.com/maps/vt",
+        "folder_name": "Layers"
+    },
+    "android_javascript_settings":
+    {
+        "arbitrary_javascript_minimum_api_level": 0,
+        "earth_feed_javascript_minimum_api_level": 0
+    },
+    "experiments_info":
+    {
+        "mendel_experiment_id": [4185536, 4200171, 4211332]
+    },
+    "filmstrip":
+    {
+        "thumbnail_url_template": "https://mw1.google.com/mw-earth-vectordb/tourguide/thumbnails/$[id].jpg",
+        "fallback_alleycat_url_template": "https://geo1.ggpht.com/cbk?output\u003dpolygon\u0026it\u003d8:$[max]\u0026radius\u003d$[radius]\u0026ll\u003d$[focus]\u0026rank\u003dcentered\u0026csp\u003d15,10\u0026cb_client\u003dearth",
+        "metadata_url_template": "https://mw1.google.com/mw-earth-vectordb/tourguide/json/$[id].json",
+        "kml_url_template": "https://mw1.google.com/mw-earth-vectordb/tourguide/tours/$[id]_$[hl].kmz",
+        "featured_tours_url": "https://mw1.google.com/mw-earth-vectordb/tourguide/featured.json",
+        "alleycat_url_template": "https://geo1.ggpht.com/cbk?output\u003dpolygon\u0026it\u003d8:$[max]\u0026polygon\u003d$[polygon]\u0026ll\u003d$[focus]\u0026rank\u003dcentered\u0026csp\u003d15,10\u0026cb_client\u003dearth"
+    },
+    "out_of_box":
+    {
+        "major_revision": 0,
+        "url": "https://www.google.com/earth/clientassets/oobe/rev0/oobe_r0__$[hl].kml"
+    }
+}
