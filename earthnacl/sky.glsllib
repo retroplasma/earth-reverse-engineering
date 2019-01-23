@@ -1,0 +1,459 @@
+// Copyright 2012 Google Inc. All Rights Reserved.
+// Author: ebruneton@google.com (Eric Bruneton)
+
+//! NAMESPACE=globe.lib.render
+//! CLASS=SkyShader
+//! SUPERCLASS=maps.render.webglshader.Shader
+//! MODE ENABLE_CLOUD_SHADER
+//! MODE ENABLE_ECLIPSE_SHADER
+//! MODE ENABLE_MOON_SHADER
+//! MODE ENABLE_STAR_SHADER
+
+//! FRAGMENT
+//precision highp float;
+
+$input "texturefilter.glsllib"
+$input "atmosphere.glsllib"
+#ifdef ENABLE_CLOUD_SHADER
+$input "cloud.glsllib"
+#endif
+#ifdef ENABLE_ECLIPSE_SHADER
+$input "sun.glsllib"
+#endif
+
+//! COMMON
+// The camera position in Atmo coordinates.
+uniform vec3 cameraAtmo;
+
+// The sun direction in Atmo coordinates (unit vector).
+uniform vec3 sunDirAtmo;
+
+// The fading coefficient for the Sun texture and for the Moon (between 0 = Sun
+// and Moon hidden to 1 = Sun and Moon fully visible).
+uniform float sunAndMoonFading;
+
+// Whether to display the sun and moon in the sky. 1 for true, 0 for false.
+uniform int uDisplaySunMoon;
+
+// .x = The camera exposure, used for tone mapping (increasing this
+// value increases the resulting luminosity of the image). Typical
+// values between 20 (at noon) to 200 (for night scenes).
+//
+// .y = The speed at which the atmospheric effects fade out when
+// zooming in from space to ground (completely unphysical
+// hack). Typical values between 0 (atmosphere never fades out) to 5
+// (atmosphere fades out very quickly).
+//
+uniform vec2 uExposureAndAtmoTweak;
+
+#ifdef ENABLE_MOON_SHADER
+// The position of the Moon in Atmo coordinates.
+uniform vec3 moonAtmo;
+#endif  // #ifdef ENABLE_MOON_SHADER
+
+#ifdef ENABLE_ECLIPSE_SHADER
+// A point on the axis of the umbra and penumbra cones of the Moon, in Atmo
+// coordinates.
+uniform vec3 eclipseOrigin;
+
+// The unit direction vector of the axis of the umbra and penumbra cones of the
+// Moon, in Atmo coordinates.
+uniform vec3 eclipseAxis;
+
+// The radius of the umbra and penumbra cones of the Moon at 'eclipseOrigin', in
+// the x and z coordinates, and the rate of change of these radiuses, in the y
+// and w coordinates.
+uniform vec4 eclipseRadius;
+#endif  // #ifdef ENABLE_ECLIPSE_SHADER
+
+#ifdef ENABLE_STAR_SHADER
+// A texture of the stars and of the Milky Way.
+uniform samplerCube starSampler;
+
+// The intensity (i.e. radiance) of the brightest stars, relatively to the
+// intensity (i.e. radiance) of the Sun.
+uniform float starIntensity;
+#endif  // #ifdef ENABLE_STAR_SHADER
+
+#if defined(ENABLE_SKY_NOSCATTER)
+// When looking at the planet from space, the minimum and maximum
+// atmosphere contribution colours to use. Found by trial and error to
+// approximate scattering effects.
+const vec3 kMaxAtmo = vec3(0.68, 0.8, .95);
+const vec3 kMinAtmo = vec3(.4, .42, .7);
+
+// Precomputed values used for determining where atmosphere should be drawn.
+uniform vec2 atmoPrecompute;
+
+// Ratio representation of how far through the atmosphere the camera is.
+// Zero represents a camera at the ground.  One represents a camera in space.
+uniform float atmoRatio;
+
+// Turn atmosphere completely off inside the planet, minus a small threshold.
+const float kAtmosphereOffThreshold = 0.99;
+
+// Atmosphere needs to get brighter as it gets closer to the camera.
+// An altitude-based adjustement used to create this effect.
+float kAltitudeAdjustmentThreshold = 4.2;
+
+// The outer and inner atmosphere intensities that we use are based on
+// the distance from the centre of the screen (in screen coordinates).
+// Toward the edge of the range, this is very faint, so boost it a bit
+// so the effect looks better.
+float kOuterBoost = 5.0;
+float kInnerBoost = 15.0;
+
+// Radius modifiers used to determine where to draw the outer and inner
+// atmosphere colours.
+float kOuterRadius = 0.93;
+float kInnerRadius = 0.94;
+
+// We use a different algorithm for atmosphere based on camera distance.
+// This is because when the earth is far away there are precision issues
+// on devices with only mediump fragment shader precision.  This constant
+// represents the altitude to start blending between the two atmospheres.
+float kNearFarBlendStart = 3.2;
+#endif  // #if defined(ENABLE_SKY_NOSCATTER)
+
+float linearstep(float edge0, float edge1, float x) {
+  return clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+}
+
+#if defined(ENABLE_SKY_NOSCATTER)
+vec4 ComputeSkyColorNoScatter(in vec3 viewDirAtmo,
+                              in vec3 viewDirSun,
+                              in vec2 vAtmoCoord,
+                              in vec3 viewDirGalactic,
+                              in vec2 planetOriginAtmoCoord) {
+#if defined(ENABLE_ATMOSPHERE)
+  // rMu represents the distance along the view ray to the point
+  // closest to the earth.
+  //
+  //     rMu
+  //  p *---* vro
+  //    | t/
+  //    |_/....surface of the earth
+  //    |/
+  //    * o
+  //
+  // where:
+  // vro = view ray origin
+  // o = origin (centre of the planet)
+  // p = closest point along the view ray to the centre of the planet.
+  // rMu = length along the view raw between p and vro.
+  // t = theta = angle between the view ray and the vector to the camera.
+  //
+  // Notice that the longest possible length for rMu is when the view ray
+  // goes through the origin.  All other lengths will be shorter.
+  //
+  // We can calculate the range for rMu lengths for a given camera
+  // position in which we want to draw atmosphere on the CPU once per
+  // frame (rMuMin and rMuMax).
+  //
+  // Note that rMu = normalize( view ray ) . (vro - o)
+  // Since the centre of the planetoid is conveniently at the origin:
+  // rMu = normalize( view ray ) . (vro)
+  //
+  vec3 viewRayOrigin = cameraAtmo;
+  vec3 viewRayDir = normalize(viewDirAtmo);
+  float rMu = -dot(viewRayOrigin, viewRayDir);
+
+  // We normalize the value of rMu in the range (rMuMin, rMuMax).
+  // (rMu - rMuMin) / (rMuMax - rMuMin )
+  //
+  // Since everything but rMu here is a constant for every pixel, we
+  // have precomputed these values at high precision.
+  float fade = (rMu - atmoPrecompute.x) * atmoPrecompute.y;
+  fade = clamp(fade, 0.0, 1.0);
+  float fade2 = fade * fade;
+
+  // TODO(b/25226916): put the stars back in here by using outStarRadiance.
+  // Stars are currently disabled due to problems compositing ETC textures
+  // in OpenGL so not bothering with them until we fix that.
+  //
+  // TODO(b/25226916): notice that fade is multiplied by maxAtmoRMuNormInv
+  // (a constant) above, and by the kMaxAtmo colour (a constant) here.
+  // As an optimisation, we could multiply these colours together once per
+  // frame at highp.  However, I have no evidence this is a bottleneck
+  // right now, and it would restrict our ability to tune the atmosphere
+  // colours, so leaving for now.
+  //
+  // The color as seen from space (default is black)
+  vec3 fade2_atmo = fade2 * kMinAtmo;
+  vec3 space_color = fade * kMinAtmo + fade2_atmo;
+
+  // As seen from inside the atmosphere (default is blue).
+  // .75 avoids overflowing resulting in strange green/red bands.
+  vec3 atmo_color = kMaxAtmo + .75 * fade2_atmo;
+
+  // Mix based on atmoRatio, which represents how close the camera
+  // is to the earth (0) vs. space (1).
+  vec3 color = mix(atmo_color, space_color, atmoRatio);
+
+  // TODO(b/25226916): This whole block needs FOV added in or it
+  // is wrong for earth.  I know how to fix this (map the FOV
+  // range onto the range of tuned values).  But it's too risky
+  // when I'm about to go on vacation.  For now, turn off the
+  // Note II atmosphere fix, which will break atmo for the Note II
+  // but fix it for portrait mode for other devices.
+  //
+  // TODO(b/25226916): As a potential future optimisation we can remove
+  // the calculations involving far_color if GL_FRAGMENT_PRECISION_HIGH
+  // is defined.  However, unless this proves a bottleneck, I suggest
+  // leaving this calculation, rather than supporting two versions of
+  // the atmosphere shader and trying to track bugs for each.
+  //
+  // The above calculation works fine closer in, but when we are futher
+  // out there are precision issues with dot product.  We are looking at
+  // a large area of space, and drawing atmosphere only in a small area,
+  // so the cos() range for the entire atmosphere is on the order of
+  // (0.611-0.612).  That's not enough for the a GPU like Mali which has
+  // only 10 bits for floating point precision.
+  //
+  // Instead of this approach then, we will cheat at high altitudes
+  // and use the screen space coordinates to draw atmosphere behind
+  // the earth.
+  //
+  // The camera's altitude.  We need to scale the size of the circle
+  // we are drawing by this factor.
+  float altitude = cameraAndSunState.x;
+
+  // How far is this pixel from the centre of the screen?
+  // TODO(b/25226916): This could potentially be moved to the vertex
+  // shader to improve performance, if that becomes an issue again.
+  // radius*altitude could be passed as a varying.
+  float radius = length(vAtmoCoord - vPlanetOriginAtmoCoord);
+
+  // Calculate an adjustment for distance, because it looks right
+  // for the atmosphere to be brighter as it gets closer to the camera.
+  // Square seems about the right fall-off.  Constant found by tuning.
+  float adjust = 1.0 - clamp(altitude - kAltitudeAdjustmentThreshold, 0.0, 1.0);
+
+  // Having the atmosphere be a single colour looks bad.  So we'll
+  // calculate an outer and an inner colour ring.  Constants determined
+  // by tuning to dictate the size of the ring.
+  float outer = 1.0 - clamp(altitude * radius * kOuterRadius, 0.0, 1.0);
+  outer *= kOuterBoost;
+
+  float inner = 1.0 - clamp(altitude * radius * kInnerRadius, 0.0, 1.0);
+  inner *= kInnerBoost + kInnerBoost * adjust;
+
+  vec3 far_color = outer * kMinAtmo + inner * kMaxAtmo;
+  vec3 near_color = color;
+
+  float mix_ratio = altitude - kNearFarBlendStart;
+  mix_ratio = clamp(mix_ratio, 0.0, 1.0);
+  color = mix(near_color, far_color, mix_ratio);
+
+  // Originally we only applied the result if the fragment was:
+  // (1) Within the atmosphere threshold OR
+  // (2) Outside the planet and atmosphere.
+  // We found that removing the extra if-branch increased our performance by 30%
+  // in low end Android devices (see b/36358046). For fragments inside the
+  // planet |sky_color| will be white.
+  return vec4(color, 1.);
+#else
+  return vec4(0., 0., 0., 1.);
+#endif
+}
+#else
+vec4 ComputeSkyColorScatter(in vec3 viewDirAtmo,
+                            in vec3 viewDirSun,
+                            in vec3 viewDirGalactic,
+                            in vec3 atmoTransmittance,
+                            in vec3 atmoInscatter) {
+  // The origin and unit direction vector of the view ray in Atmo Coordinates.
+  vec3 viewRayOrigin = cameraAtmo;
+  vec3 viewRayDir = normalize(viewDirAtmo);
+
+  // The corresponding radius r and view zenith angle cosinus mu
+  // (in fact the square of r and the product -r.mu).
+  float r2 = dot(viewRayOrigin, viewRayOrigin);
+  float rMu = -dot(viewRayOrigin, viewRayDir);
+
+ // The distance to the exit point in the atmosphere.
+  float delta = rMu * rMu - r2 + kAtmosphereRadius * kAtmosphereRadius;
+  float distanceToAtmosphereExitPoint = rMu + sqrt(delta);
+
+ // The radiance of the Sun, outside the atmosphere.
+  vec3 outSunRadiance = (uDisplaySunMoon > 0) ? outerSunRadiance(viewDirSun) *
+    sunAndMoonFading : vec3(0, 0, 0);
+
+#ifdef ENABLE_STAR_SHADER
+  // The radiance of the stars and of the Milky Way, outside the atmosphere.
+  // The star texture does not store the radiance but pow(radiance, .25), in
+  // order to compress the high dynamic range of star luminosities in 8 bits
+  // with good precision. Thus we need to take the fourth power of the texture
+  // sample to get the real star radiance back.
+  vec3 outStarRadiance = sampleTextureCube(starSampler, viewDirGalactic).rgb;
+  outStarRadiance *= outStarRadiance;
+  outStarRadiance *= outStarRadiance;
+  // Multiply by the maximum star radiance to get the final star radiance.
+  outStarRadiance *= starIntensity;
+#else
+  vec3 outStarRadiance = vec3(0.0);
+#endif
+
+#ifdef ENABLE_MOON_SHADER
+  const float kMoonRadius = 1737.0 / 6371.0;  // The Moon radius in Earth radii.
+  vec3 o = viewRayOrigin - moonAtmo;
+  float b = dot(o, viewRayDir);
+  float c = dot(o, o) - (kMoonRadius * kMoonRadius * 1.3);
+  float d = b * b - c;
+  // If the view ray hits the Moon (plus a margin for antialising, whose value
+  // is hardcoded for a typical FOV and viewport size).
+  if (d > 0.0 && uDisplaySunMoon > 0) {
+    float t = -b - sqrt(d);
+    if (t > 0.0) {
+      // Computes the Moon normal at the intersection point, and its dot
+      // product with the Sun direction to compute the Moon radiance.
+      vec3 moonNormal = (o + t * viewRayDir) * (1.0 / kMoonRadius);
+      float moonNdotL = dot(moonNormal, sunDirAtmo);
+      // This is extremely exaggerated, since the Sun radiance is in fact about
+      // 400,000 times the radiance of the Moon (since we use 1 for the Sun
+      // radiance, we should multiply by about 2.5e-6 here, instead of 0.1).
+      // The two linearsteps antialias the terminator line and the silhouette
+      // (the constants are hardcoded for a typical FOV and viewport size).
+      float moonRadiance = linearstep(-0.2, 0.2, moonNdotL) * 0.1;
+      moonRadiance *= linearstep(0.0, kMoonRadius * kMoonRadius * 0.5, d);
+      // The Moon hides the Sun and the stars behind it.
+      outSunRadiance =
+          mix(outSunRadiance, vec3(moonRadiance), sunAndMoonFading);
+      outStarRadiance *= 1. - sunAndMoonFading;
+    }
+  }
+#endif
+
+  // If the view ray does not hit the atmosphere.
+  // Test if (delta < 0.0 || distanceToAtmosphereExitPoint <= 0.0).
+  if (step(delta, 0.0) + step(distanceToAtmosphereExitPoint, 0.0) > 0.5) {
+#ifdef ENABLE_ECLIPSE_SHADER
+    outSunRadiance *= sunVisibility(
+        eclipseOrigin, eclipseAxis, eclipseRadius, viewRayOrigin);
+#endif
+    vec3 outRadiance = outSunRadiance + outStarRadiance;
+    return vec4(toneMapping(outRadiance, uExposureAndAtmoTweak.x), 1.0);
+  }
+
+  // Computes the radiance and transmittance of the atmosphere.
+#ifdef ENABLE_ATMOSPHERE
+  vec3 transmittance = atmoTransmittance;
+  vec3 inscatterL = atmoInscatter;
+#else
+  vec3 transmittance = vec3(1);
+  vec3 inscatterL = vec3(0);
+#endif
+
+#ifdef ENABLE_ECLIPSE_SHADER
+  float visibleSunFraction = sunVisibility(
+      eclipseOrigin, eclipseAxis, eclipseRadius, viewRayOrigin);
+  outSunRadiance *= visibleSunFraction;
+  // In the presence of eclipses, the inscattered Sun light is the integral of
+  // the inscattered light, times the visible Sun fraction, along the view ray.
+  // Here we make a double approximation: first we approximate this integral of
+  // a product with a product of integrals, to be able to reuse the precomputed
+  // inscatter integral without eclipses. Finally we approximate the integral of
+  // the Sun visibility along the view ray with a single sample, taken at the
+  // origin of this ray (which is a quite coarse approximation).
+  inscatterL *= visibleSunFraction;
+#endif
+
+  vec3 outRadiance = outSunRadiance + outStarRadiance;
+
+#ifdef ENABLE_CLOUD_SHADER
+  // If the camera is below the clouds.
+  if (cameraAndSunState.x <  cloudAltitudeOpacityAlbedoAndFading.x) {
+#ifdef ENABLE_ECLIPSE_SHADER
+    // Here we should normally use the visible Sun fraction at the intersection
+    // of the view ray with the clouds. We use the value already computed at the
+    // view ray origin to save computations.
+    vec4 cloudLA = cloudRadianceAndOpacity(
+        viewRayDir, viewRayOrigin, sunDirAtmo, visibleSunFraction);
+#else
+    vec4 cloudLA =
+        cloudRadianceAndOpacity(viewRayDir, viewRayOrigin, sunDirAtmo, 1.0);
+#endif
+    // With clouds of opacity alpha, the final pixel radiance should be
+    //   mix(inscatterL + transmittance * outRadiance,
+    //       inscatterLToClouds + transmittanceToClouds * cloudRadiance, alpha)
+    // where the first term is the radiance in the absence of clouds, and the
+    // second term is the radiance of totally opaque clouds - inscatterLToClouds
+    // is the inscattered light along the ray from the eye to the clouds, and
+    // transmittanceToClouds is the transmittance along this ray segment. Here
+    // we approximate transmittanceToClouds with transmittance. We can thus
+    // rewrite the final pixel radiance as:
+    //   mix(inscatterL, inscatterLToClouds, alpha) + transmittance *
+    //       mix(outRadiance, cloudRadiance, alpha)
+    // In other words, we can use the general formula
+    //   inscatterL + transmittance * outRadiance
+    // provided we modify inscatterL and outRadiance as follows before using it:
+    //   inscatterL = mix(inscatterL, inscatterLToClouds, alpha)
+    //   outRadiance = mix(outRadiance, cloudRadiance, alpha)
+    // with cloudRadiance = cloudLA.rgb and alpha = cloudLA.a. The only
+    // remaining term that we need is inscatterLToClouds. This is really complex
+    // to compute exactly, because at each point along the ray from the eye to
+    // the clouds, we need a shadow test to determine is this point is lit by
+    // the Sun or not. Here we assume that all the points are lit (thus we lose
+    // the ability to render light shafts, aka god rays). But even with this
+    // assumption, computing inscatterLToClouds would require a call to the
+    // costly inscatter() function, modified to take the clouds into account
+    // (e.g., in an overcast sky, the "single scattered light" - not counting
+    // all the scattering events that occured in the clouds or before - comes
+    // from all directions instead of from the Sun direction only). Instead of
+    // computing all this, we use a simple and completly ad-hoc approximation
+    // based on inscatterL (the inscattering in the absence of clouds). This
+    // approximation multiplies inscatterL by a factor going from 1 at the
+    // horizon to 0 at the zenith.
+    float factor = 1.0 - dot(viewRayOrigin, viewRayDir);
+    vec3 inscatterLToClouds = inscatterL * factor;
+    inscatterL = mix(inscatterL, inscatterLToClouds, cloudLA.a);
+    outRadiance = mix(outRadiance, cloudLA.rgb, cloudLA.a);
+  }
+#endif
+  vec3 pixelL = inscatterL + transmittance * outRadiance;
+  return vec4(toneMapping(pixelL, uExposureAndAtmoTweak.x) *
+              cameraAndSunState.w, 1.0);
+}
+#endif
+
+void ComputeInscatter(out vec3 atmoTransmittance, out vec3 atmoInscatter) {
+  vec3 viewRayOrigin = cameraAtmo;
+  vec3 viewRayDir = normalize(viewDirAtmo);
+
+  // The corresponding radius r and view zenith angle cosinus mu
+  // (in fact the square of r and the product -r.mu).
+  float r2 = dot(viewRayOrigin, viewRayOrigin);
+  float rMu = -dot(viewRayOrigin, viewRayDir);
+
+  // The distances to the entry and exit points in the atmosphere.
+  float delta = rMu * rMu - r2 + kAtmosphereRadius * kAtmosphereRadius;
+  float deltaSqrt = sqrt(delta);
+  float distanceToAtmosphereEntryPoint = rMu - deltaSqrt;
+  float distanceToAtmosphereExitPoint = rMu + deltaSqrt;
+
+  // If the view ray does not hit the atmosphere.
+  // Test if (delta < 0.0 || distanceToAtmosphereExitPoint <= 0.0).
+  if (step(delta, 0.0) + step(distanceToAtmosphereExitPoint, 0.0) > 0.5) {
+    atmoTransmittance = vec3(1.0);
+    atmoInscatter = vec3(0.0);
+  } else {
+    // Otherwise, if the viewer is in space, moves the camera to the entry
+    // point.
+    if (distanceToAtmosphereEntryPoint > 0.0) {
+      viewRayOrigin += distanceToAtmosphereEntryPoint * viewRayDir;
+      r2 = kAtmosphereRadius * kAtmosphereRadius;
+      rMu -= distanceToAtmosphereEntryPoint;
+    }
+
+    // Computes the distance r from the camera to the planet center, and the
+    // cosinus mu, muS and nu of the view zenith angle, Sun zenith angle and
+    // phase angle at the camera.
+    float r = sqrt(r2);
+    float mu = -rMu / r;
+    float muS = dot(viewRayOrigin, sunDirAtmo) / r;
+    float nu = dot(viewRayDir, sunDirAtmo);
+
+    atmoInscatter =
+        inscatter(r, mu, muS, nu, uExposureAndAtmoTweak.x, atmoTransmittance);
+  }
+}

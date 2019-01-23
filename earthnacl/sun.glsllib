@@ -1,0 +1,42 @@
+// Copyright 2012 Google Inc. All Rights Reserved.
+// Author: ebruneton@google.com (Eric Bruneton)
+
+// This file defines a function to compute the smooth shadow due to an eclipse,
+// based on the axis and radius of the umbra and penumbra cones of the planetoid
+// casting this shadow.
+
+//! FRAGMENT
+
+// The fading coefficient for eclipse effects. This coefficient varies between
+// zero (eclipses not shown) to one (eclipses fully visible).
+uniform float eclipseFading;
+
+// Returns the fraction of the Sun disc that is visible at 'pos', based on the
+// relative position of this point with respect to an umbra and penumbra cone.
+// The cones share the same axis defined by the point 'origin' (not necessarily
+// the apex), and the unit direction vector 'axis'. Their radius at 'origin' is
+// defined by the x and z coordinates of 'radius', and the rate of change of
+// these radiuses along 'axis' by the y and w coordinates, respectively. All
+// quantities must be expressed in the same coordinate system, which can be
+// arbitrary (the rate of change are unitless: they measure a radius increase
+// per unit of distance).
+float sunVisibility(vec3 origin, vec3 axis, vec4 radius, vec3 pos) {
+  // Compute the signed distance 'x' from 'origin' to 'pos'.
+  vec3 p = pos - origin;
+  float x = dot(p, axis);
+  // Compute the distance 'xRadius' from 'pos' to the cones axis, and the
+  // radiuses of the umbra and penumbra cones at 'pos'.
+  float xRadius = sqrt(dot(p, p) - x * x);
+  float umbraRadius = radius.x + x * radius.y;
+  float penumbraRadius = radius.z + x * radius.w;
+  // The exact fraction of the Sun disc that is visible at 'pos' is given by a
+  // complex formula measuring the area of the intersection between two discs.
+  // We use a simple smoothstep from 0 in the umbra cone to 1 at the boundary of
+  // the penumbra cone (see "Ambient Aperture Lighting" C. Oat and P. V. Sander
+  // for more details).
+  return mix(1., smoothstep(umbraRadius, penumbraRadius, xRadius),
+      eclipseFading);
+  // Alernative version, cheaper but produces a smaller shadow.
+  //float visibility = (xRadius - umbraRadius) / (penumbraRadius - umbraRadius);
+  //return mix(1., clamp(visibility, 0.0, 1.0), eclipseFading);
+}

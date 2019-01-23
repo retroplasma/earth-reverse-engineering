@@ -1,0 +1,168 @@
+// Don't replace these #endif/#if with #elif - this is a workaround for Mali 400
+// preprocessor bug.
+#if defined(AGGREGATE)
+uniform mat4 uMeshToWorldMatrixArray[UNIFORM_ARRAY_SIZE];
+attribute float aMeshToWorldMatrixIndex;
+#else
+uniform mat4 uMeshToWorldMatrix;
+#endif
+uniform mat4 uModelviewMatrix;
+uniform mat4 uProjModelviewMatrix;
+uniform mat4 uWorldToWaterMatrix;
+
+attribute vec4 aPosition;
+
+#if defined(ENABLE_IMPROVED_WATER)
+attribute float aAlpha;
+#endif
+
+#if defined(DRAPED)
+uniform mat4 uDrapedProjModelviewMatrix;
+#if defined(AGGREGATE)
+uniform vec3 uDrapedDpOffsetArray[UNIFORM_ARRAY_SIZE];
+#else
+uniform vec3 uDrapedDpOffset;
+#endif
+attribute vec4 aDrapedTexCoord_LayerId;
+varying vec3 vDrapedTexCoord;
+#endif
+
+// Directions of translation of waves (i.e. bump map look ups). These
+// must be unit vectors aligned to the uv axes in order to facilitate looping.
+const vec2 wave_dir_0 = vec2(0.0, -1.0);
+const vec2 wave_dir_1 = vec2(1.0, 0.0);
+const vec2 wave_dir_2 = vec2(-1.0, 0.0);
+const vec2 wave_dir_3 = vec2(0.0, 1.0);
+
+#if defined(ENABLE_IMPROVED_WATER)
+$input "atmosphere.glsllib"
+uniform vec3 sunDirWater;
+uniform vec4 uEyePosAndAnimTime;
+uniform vec4 uAtmosphereTweaks;
+uniform vec4 uFogColorAndDensity;
+
+// Vertex position in water coordinates translated by one Earth radius (so z
+// is the altitude above water, not the distance to the Earth center) and
+// vertex alpha.
+varying vec4 vout_water_pos_and_alpha;
+varying vec3 transmittance;
+varying vec3 inscatterL;
+#endif  // ENABLE_IMPROVED_WATER
+
+#if defined(ENABLE_IMPROVED_WATER)
+// Implements the abstract function defined in atmosphere.glsllib.
+// Returns a fading factor to attenuate the atmospheric effects when the camera
+// altitude decreases, unless the view zenith angle gets close to the horizon
+// angle.
+float atmosphereTweak(float r, float mu) {
+  const float rMinSq = kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+  float metersInViewY = cameraAndSunState[2];
+  float rFading = metersInViewY * (1.0 / 14500000.0);
+  float muFading = (1.0 + mu) / (1.0 - sqrt(1.0 - rMinSq / (r * r)));
+  float fading = clamp(max(rFading, muFading), 0.0, 1.0);
+  return pow(fading, uFogColorAndDensity.w);
+}
+
+void ComputeImprovedWater(in vec3 water_pos) {
+  // Computes the camera to Earth center distance r, the view direction zenith
+  // angle cosinus mu, the Sun zenith angle cosinus muS, and the phase angle
+  // cosinus nu (taking advantage of the fact that waterCamera.xy = 0,0 by
+  // definition of the water coordinate system).
+  float r = cameraAndSunState.x;
+  vec3 waterCamera = uEyePosAndAnimTime.xyz;
+  vec3 waterPosToCamera = waterCamera - water_pos;
+  float waterDist = length(waterPosToCamera);
+  vec3 waterViewDir = waterPosToCamera / waterDist;
+  float rMu = -(waterCamera.z + 1.0) * waterViewDir.z;
+  float rMuS = (waterCamera.z + 1.0) * sunDirWater.z;
+  float nu = -dot(waterViewDir, sunDirWater);
+
+  // If the camera is outside the atmosphere, moves it to the entry point of the
+  // view ray inside the atmosphere (which necessarily exists).
+  if (r > kAtmosphereRadius) {
+    // Computes the distance to the view ray entry point in the atmosphere.
+    float delta = rMu * rMu - r * r + kAtmosphereRadius * kAtmosphereRadius;
+    float distanceToAtmosphereEntryPoint = -rMu - sqrt(delta);
+    // Moves the camera to the view ray entry point inside the atmosphere.
+    r = kAtmosphereRadius;
+    rMu += distanceToAtmosphereEntryPoint;
+    rMuS += distanceToAtmosphereEntryPoint * nu;
+  }
+
+  // Computes the light which is scattered towards the viewer along the view
+  // ray, and the transmittance of the atmosphere along this ray.
+  transmittance = vec3(1.0);
+  inscatterL = vec3(0.0);
+
+#if !defined(ENABLE_TERRAIN_ATMOSPHERE_NOSCATTER)
+#if defined(APPROXIMATE_AERIAL_PERSPECTIVE)
+  inscatterL = inscatter(
+      r, rMu / r, rMuS / r, nu, uAtmosphereTweaks.w, transmittance);
+#else
+  inscatterL = inscatter(
+      r, rMu / r, rMu, rMuS / r, nu, waterDist, uAtmosphereTweaks.w,
+      transmittance);
+#endif
+#endif
+}
+#endif  // ENABLE_IMPROVED_WATER
+
+// Returns 0.0 if the vertex is masked out, or 1.0 if the vertex isn't masked.
+float ComputeMasking(float octant_mask) {
+  // Filter out octants according to |octant_mask|. aPosition.w contains
+  // an encoding of the octant of the current vertex.
+  float fract_mask = octant_mask / (aPosition.w * 2.);
+  return floor((fract_mask - floor(fract_mask)) * 2.);
+}
+
+// Vertex shader program.
+// All math is done in water coordinates.
+void main() {
+#if defined(AGGREGATE)
+  int matrix_index = int(aMeshToWorldMatrixIndex);
+  mat4 mesh_to_world_matrix =
+      uMeshToWorldMatrixArray[int(aMeshToWorldMatrixIndex)];
+#else
+  mat4 mesh_to_world_matrix = uMeshToWorldMatrix;
+#endif
+
+  // We hijack the boring part of the matrix with octant_mask and vUnpopOpacity.
+  float octant_mask = mesh_to_world_matrix[3][3];
+  mesh_to_world_matrix[2][3] = 0.;
+  mesh_to_world_matrix[3][3] = 1.;
+
+  // Water position in world coordinates.
+  vec4 water_pos = mesh_to_world_matrix * vec4(aPosition.xyz, 1.0);
+  // Water position in clip coordinates.
+  vec4 pos_in_clip = uProjModelviewMatrix * water_pos;
+
+  // Push depth towards the eye to avoid zfighting near coastal areas.  This is
+  // a heuristic number which seems to eliminate zfighting but not make water
+  // poke through forgreound terrain. Scaling w gives us a zoom-dependent push
+  // so we get greater push when zoomed out. A constant push wouldn't work as
+  // well across zoom ranges.
+  pos_in_clip.w *= 1.00001;
+
+#if defined(ENABLE_IMPROVED_WATER)
+  // Water position in water coordinates.
+  vec3 water_pos_local = (uWorldToWaterMatrix * vec4(water_pos.xyz, 0.0)).xyz;
+
+  // Water position in water coordinates.
+  ComputeImprovedWater(water_pos_local);
+  vout_water_pos_and_alpha = vec4(water_pos_local, aAlpha);
+#endif
+
+  gl_Position = pos_in_clip * ComputeMasking(octant_mask);
+
+#if defined(DRAPED)
+  vec3 dp_offset;
+#if defined(AGGREGATE)
+  dp_offset = uDrapedDpOffsetArray[matrix_index];
+#else
+  dp_offset = uDrapedDpOffset;
+#endif
+  vec4 draped_tex_coord = uDrapedProjModelviewMatrix *
+      vec4(dp_offset + aDrapedTexCoord_LayerId.xyz, 1.);
+  vDrapedTexCoord = draped_tex_coord.xyw;  // Remember w for texture2DProj().
+#endif
+}

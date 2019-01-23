@@ -1,0 +1,58 @@
+// uProjectionMatrix as computed in app, is transposed when sent to gl.
+// X = (2 * n) / (r - l);
+// Y = (2 * n) / (t - b);
+// A = (r + l) / (r - l);
+// B = (t + b) / (t - b);
+// C = (n + f) / (n - f);
+// D = (2 * n * f) / (n - f);
+// (X, 0, A, 0,
+//  0, Y, B, 0,
+//  0, 0, C, D,
+//  0, 0, -1, 0);
+
+// Returns zeye from zndc. Need to do so to compute depth push for primitives
+// whose coordinates are specified in NDC.
+// zclip = C * zeye + D;
+// zndc = zclip / w = zclip / -zeye = -(C * zeye + D) / zeye
+// zeye * zndc = -C * zeye - D
+// zeye * (zndc + C) = -D
+// zeye = -D / (zndc + C)
+float GetZEyeFromNdc(float zndc) {
+  float C = uProjectionMatrix[2][2];
+  float D = uProjectionMatrix[3][2];  // Note the transpose.
+  float zeye = -D / (zndc + C);
+  return zeye;
+}
+
+// Give a depth push in eye coordinates and a z in NDC coordinates, returns
+// a z in NDC, taking care not to push unclipped z's beyond the near plane.
+float GetPushedDepthInNdc(float push_in_eye, in float z_ndc) {
+  // Return the input |z_ndc| if |push_in_eye| is zero.  This avoids the
+  // division-by-zero error in some cases where a small matrix element |D| is
+  // treated as zero when computing |dz_ndc|.
+  if (push_in_eye == 0.)
+    return z_ndc;
+  // zc -> Clip coordinates, ze -> Eye coordinates, zn - NDC coordinates
+  // OpenGL perspective matrix formula for zc:
+  // zc = C * ze + D * we, we = 1
+  // wc = -ze
+  // zn = zc / wc
+  // zn = -C - D / ze
+  // Following derives dzn/dze derivative so we can figure out how a push in
+  // eye coordinates maps to a push in NDC coordinates.
+  // dzn/dze = D / ze^2
+  // D / ze = -C - zn, D = -ze * (C + zn)
+  // ze = -D / (C + zn)
+  // ze^2 = D^2 / (C + zn)^2
+  // dzn/dze = (C + zn)^2 / D
+  // dzn = dze * (C + zn)^2 / D
+  // dze = push_in_eye
+  float C = uProjectionMatrix[2][2];
+  float D = uProjectionMatrix[3][2];  // Note the transpose.
+  float t = C + z_ndc;
+  float dz_ndc = push_in_eye * (t * t) / D;
+  float pushed_z = z_ndc + dz_ndc;
+  // Don't push unclipped z beyond near plane. Use value very close to near
+  // plane since -1. seems to clip sometimes.
+  return z_ndc > -1. ? max(-.9999, pushed_z) : z_ndc;
+}

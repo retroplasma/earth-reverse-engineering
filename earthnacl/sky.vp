@@ -1,0 +1,89 @@
+//! COMMON
+// The view ray direction vector in Atmo Coordinates
+// (pointing *away* from the camera, *not* normalized).
+varying vec3 viewDirAtmo;
+
+// The view ray direction vector in Sun Coordinates
+// (pointing *away* from the camera, *not* normalized).
+varying vec3 viewDirSun;
+
+#ifdef ENABLE_STAR_SHADER
+// The view ray direction vector in Galactic Coordinates
+// (pointing *away* from the camera, *not* normalized).
+varying vec3 viewDirGalactic;
+#endif
+
+#ifdef ENABLE_SKY_NOSCATTER
+// Atmosphere coordintes.  These are calculated from the screen space
+// coordinates of the vertices.
+varying vec2 vAtmoCoord;
+varying vec2 vPlanetOriginAtmoCoord;
+#else
+#if defined(VERTEX_SHADED) && defined(ENABLE_ATMOSPHERE)
+varying vec3 atmoTransmittance;
+varying vec3 atmoInscatter;
+#endif
+#endif
+
+//! VERTEX
+#ifdef ENABLE_SKY_NOSCATTER
+uniform vec2 atmoCoordClipScale;
+uniform vec3 uWorldOriginInEye;
+uniform mat4 uProjectionMatrix;
+#else
+#if defined(VERTEX_SHADED) && defined(ENABLE_ATMOSPHERE)
+$input "sky.glsllib"
+// Implements the abstract function defined in atmosphere.glsllib.
+float atmosphereTweak(float r, float mu) {
+  return 1.0;
+}
+#endif
+#endif
+
+// The vertex position in Clip Coordinates (or, when stars are enabled, in
+// Tile coordinates, i.e. in local coordinates of a cubemap texture tile).
+attribute vec4 aPosition;
+
+// The transform from Clip Coordinates to Eye Coordinates.
+uniform mat4 matrixEyeFromClip;
+
+// The transform from Eye Coordinates to Globe Coordinates (origin at the
+// planet center, z axis pointing to the North).
+uniform mat4 matrixGlobeFromEye;
+
+// The transform from Globe Coordinates to Sun Coordinates (z axis pointing to
+// the Sun).
+uniform mat3 matrixSunFromGlobe;
+
+#ifdef ENABLE_STAR_SHADER
+// The transform from Globe Coordinates to Galactic Coordinates.
+uniform mat3 matrixGalacticFromGlobe;
+#endif
+
+void main() {
+  vec3 posClip = aPosition.xyz;
+  gl_Position = vec4(posClip.xy, 1.0, 1.0);
+  vec3 viewDirEye = (matrixEyeFromClip * vec4(posClip.xyz, 1.0)).xyz;
+  // The view ray direction vector in Atmo Coordinates
+  // (pointing *away* from the camera, *not* normalized).
+  viewDirAtmo = (matrixGlobeFromEye * vec4(viewDirEye, 0.0)).xyz;
+  // The view ray direction vector in Sun Coordinates
+  // (pointing *away* from the camera, *not* normalized).
+  viewDirSun = matrixSunFromGlobe * viewDirAtmo;
+#ifdef ENABLE_STAR_SHADER
+  // The view ray direction vector in Galactic Coordinates
+  // (pointing *away* from the camera, *not* normalized).
+  viewDirGalactic = matrixGalacticFromGlobe * viewDirAtmo;
+#endif
+#if defined(ENABLE_SKY_NOSCATTER)
+  // Screen-space atmosphere coordinates.
+  vAtmoCoord = posClip.xy * atmoCoordClipScale;
+  vec4 planetOriginNdc = uProjectionMatrix * vec4(uWorldOriginInEye, 0.0);
+  vPlanetOriginAtmoCoord =
+      (planetOriginNdc.xy / planetOriginNdc.w) * atmoCoordClipScale;
+#else
+#if defined(VERTEX_SHADED) && defined(ENABLE_ATMOSPHERE)
+  ComputeInscatter(atmoTransmittance, atmoInscatter);
+#endif
+#endif
+}

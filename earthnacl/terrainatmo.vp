@@ -1,0 +1,91 @@
+#if defined(ENABLE_ATMOSPHERE)
+#if defined(ENABLE_TERRAIN_ATMOSPHERE_NOSCATTER)
+// TODO(b/25226431) : These constant definitions come from atmosphere.glsllib.
+// Copy-pasting them here is less than ideal, but we cannot include
+// atmosphere.glsllib here, as it defines functions that make texture2D()
+// calls, which are not supported (and will not compile) on Mali-400 GPUs.
+// In the meantime, see that file for definitions of these constants.
+const float kPlanetRadiusInKm = 6360.0;
+const float kOuterAtmosphereRadiusInKm = 6420.0;
+const float kAtmosphereHeight =
+    (kOuterAtmosphereRadiusInKm - kPlanetRadiusInKm) / kPlanetRadiusInKm;
+// Constant used to calculate non scattering version of
+// atmosphere effects.
+const float kAtmosphereHeightInv = 1.0 / kAtmosphereHeight;
+varying float vMu;
+
+// Faster, approximate atmosphere mode.
+void ComputeAtmosphereNoScatter(in vec4 pos_in_eye) {
+  // vec3 eye = vec3(0.); Eye is at the origin.
+  vec3 view_dir = pos_in_eye.xyz /* - eye */;
+  float view_len = length(view_dir);
+  view_dir *= 1. / view_len;
+  vec3 globe_normal = normalize(pos_in_eye.xyz - uWorldOriginInEye);
+  // Tilt = 0 straight down.
+  float tilt = 1. - max(0., -dot(view_dir, globe_normal));
+  // Compute haze as view_len normalized to kAtmosphereHeight or
+  // kAtmosphereHeight / 2 based on tilt so we have more haze in tilted views.
+  float haze = min(1., view_len *
+                   mix(kAtmosphereHeightInv, kAtmosphereHeightInv * 2., tilt));
+  // Multiply by tilt so that we have clear view when looking straight down.
+  // sqrt pushes haze farther away.
+  vMu = sqrt(1. - tilt * haze);
+}
+
+void ComputeAtmosphere(in vec4 pos_in_eye) {
+  ComputeAtmosphereNoScatter(pos_in_eye);
+}
+
+void ComputeAtmosphereWithNormals(in vec4 pos_in_eye, in vec3 normal) {
+  ComputeAtmosphereNoScatter(pos_in_eye);
+}
+
+#else  // #if defined(ENABLE_TERRAIN_ATMOSPHERE_NOSCATTER)
+#define VERTEX_SHADER  // Only enables the vertex bits in ground.glsllib
+$input "ground.glsllib"
+#undef VERTEX_SHADER
+uniform mat4 uEyeToAtmoMatrix;
+uniform vec3 cameraAtmo;
+uniform vec3 sunDirAtmo;
+varying vec3 posAtmo;
+#if defined(FRAGMENT_ATMOSPHERE)
+varying vec3 normalAtmo;
+#else
+varying vec3 sunIrradiance;
+varying vec3 sunRadiance;
+varying vec4 skyIrradianceAndNight;
+varying vec3 transmittance;
+varying vec3 inscattering;
+#endif  // #else if defined(FRAGMENT_ATMOSPHERE)
+
+// Full atmosphere mode.
+void ComputeAtmosphereScatter(in vec3 pos_atmo, in vec3 normal_atmo) {
+  posAtmo = pos_atmo;
+#if !defined(FRAGMENT_ATMOSPHERE)
+  terrainShadingVS(cameraAtmo, posAtmo, normal_atmo, sunDirAtmo,
+                   sunIrradiance, skyIrradianceAndNight,
+                   transmittance, inscattering, sunRadiance);
+#else
+  normalAtmo = normal_atmo;
+#endif
+}
+
+void ComputeAtmosphere(in vec4 pos_in_eye) {
+  vec3 pos_atmo = (uEyeToAtmoMatrix * pos_in_eye).xyz;
+  ComputeAtmosphereScatter(pos_atmo, normalize(pos_atmo));
+}
+
+void ComputeAtmosphereWithNormals(in vec4 pos_in_eye, in vec3 normal) {
+  ComputeAtmosphereScatter((uEyeToAtmoMatrix * pos_in_eye).xyz, normal);
+}
+#endif  // #else if defined(ENABLE_TERRAIN_ATMOSPHERE_NOSCATTER)
+#endif  // #if defined(ENABLE_ATMOSPHERE)
+
+void InjectVertex(
+    in vec4 pos_in_offset, out vec4 pos_in_eye, out vec4 pos_in_clip) {
+  pos_in_eye = uModelviewMatrix * pos_in_offset;
+#if defined(ENABLE_ATMOSPHERE)
+  ComputeAtmosphere(pos_in_eye);
+#endif  // #if defined(ENABLE_ATMOSPHERE)
+  pos_in_clip = uProjectionMatrix * pos_in_eye;
+}

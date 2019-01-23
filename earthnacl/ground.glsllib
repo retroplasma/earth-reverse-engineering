@@ -1,0 +1,350 @@
+// Copyright 2011-2012 Google Inc. All Rights Reserved.
+// Author: ebruneton@google.com (Eric Bruneton)
+
+// This file defines functions to render the ground with physically based
+// lighting (Sun light attenuated by the atmosphere, sky light, and aerial
+// perspective). Requires 'third_party/artis_earth_shaders/atmosphere.glsllib'.
+
+//! INCLUDE atmosphere.glsllib
+//! MODE ENABLE_ATMOSPHERE_TWEAK
+//! MODE ENABLE_CITY_LIGHT_SHADER
+//! MODE ENABLE_CLOUD_SHADER
+//! MODE ENABLE_CLOUD_SHADOWS
+//! MODE ENABLE_ECLIPSE_SHADER
+//! MODE ENABLE_MESH_LIGHTING
+//! MODE ENABLE_MOON_LIGHTING
+//! MODE ENABLE_WATER_LIGHTING
+//! COMMON
+//#undef ENABLE_ATMOSPHERE
+$input "atmosphere.glsllib"
+
+// .x = The camera exposure, used for tone mapping (increasing this
+// value increases the resulting luminosity of the image). Typical
+// values between 20 (at noon) to 200 (for night scenes).
+//
+// .y = The speed at which the atmospheric effects fade out when
+// zooming in from space to ground (completely unphysical
+// hack). Typical values between 0 (atmosphere never fades out) to 5
+// (atmosphere fades out very quickly).
+//
+uniform vec2 uExposureAndAtmoTweak;
+
+// VERTEX,FRAGMENT_SHADER allow us to include this file into both .vp, .fp
+// files and conditinally compile only those bits we care about.
+#if defined(FRAGMENT_SHADER)
+#ifdef ENABLE_WATER_LIGHTING
+$input "water.glsllib"
+#endif
+#if defined(ENABLE_CLOUD_SHADER) || defined(ENABLE_CLOUD_SHADOWS)
+$input "cloud.glsllib"
+#endif
+#ifdef ENABLE_ECLIPSE_SHADER
+$input "sun.glsllib"
+#endif
+
+#ifdef ENABLE_WATER_LIGHTING
+// .x = brightness of the Sun glint on the water. To get "physically correct"
+// results, set this to 1.
+// .y = water opacity coefficient, to fade it out when zooming in.
+uniform vec2 waterParams;
+#endif
+
+#ifdef ENABLE_CITY_LIGHT_SHADER
+// The radiance of the city lights at night.
+uniform samplerCube cityLightSampler;
+
+// The city lights fading coefficient, to fade them out when zooming in.
+uniform float cityLightFading;
+#endif
+
+#ifdef ENABLE_ECLIPSE_SHADER
+// A point on the axis of the umbra and penumbra cones of the Moon, in Atmo
+// coordinates.
+uniform vec3 eclipseOrigin;
+
+// The unit direction vector of the axis of the umbra and penumbra cones of the
+// Moon, in Atmo coordinates.
+uniform vec3 eclipseAxis;
+
+// The radius of the umbra and penumbra cones of the Moon at 'eclipseOrigin', in
+// the x and z coordinates, and the rate of change of these radiuses, in the y
+// and w coordinates.
+uniform vec4 eclipseRadius;
+#endif  // #ifdef ENABLE_ECLIPSE_SHADER
+#endif  // #if defined(FRAGMENT_SHADER)
+
+const float kNightColor = 0.014;
+
+// Implements the abstract function defined in atmosphere.glsllib.
+// Returns a fading factor to attenuate the atmospheric effects when the camera
+// altitude decreases, unless the view zenith angle gets close to the horizon
+// angle.
+float atmosphereTweak(float r, float mu) {
+  const float rMinSq = kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+  float metersInViewY = cameraAndSunState[2];
+  float rFading = metersInViewY * (1.0 / 14500000.0);
+  float muFading = (1.0 + mu) / (1.0 - sqrt(1.0 - rMinSq / (r * r)));
+  float fading = clamp(max(rFading, muFading), 0.0, 1.0);
+  return min(1.0, pow(fading, uExposureAndAtmoTweak.y));
+}
+
+#if defined(VERTEX_SHADER)
+#ifdef ENABLE_MOON_LIGHTING
+// Unit direction vector towards the Moon, times the Moon phase between 0 (new
+// Moon) and 1 (full Moon).
+uniform vec3 moonDirAtmoTimesPhase;
+#endif
+
+void terrainShadingVS(
+    vec3 cameraAtmo, vec3 posAtmo, vec3 normalAtmo, vec3 sunDirAtmo,
+    out vec3 outSunIrradiance,
+    out vec4 outSkyIrradianceAndNight,
+    out vec3 outTransmittance,
+    out vec3 outInscattering,
+    out vec3 outSunRadiance) {
+  // Computes the radiance of the Sun reaching posAtmo, relatively to the
+  // outer Sun radiance. This is the transmittance of the atmosphere from the
+  // ground to the top atmosphere boundary in direction sunDirAtmo (assuming
+  // there are no clouds - they are taken into account below).
+  float r = length(posAtmo);
+  vec3 zenithDirAtmo = posAtmo / r;
+  // For large values of metersInViewY the mesh is too coarse to give a precise
+  // radius r, and the mountains can't be seen, so we can approximate the
+  // terrain with a perfect sphere to hide the artifacts due to the mesh (these
+  // artifacts can only be seen on clouds, near the terminator line, because
+  // they have a high albedo that boosts the sunRadiance contribution in the
+  // final result). The 1e7 value was chosen empirically as the largest value
+  // that is sufficient to hide the above artifacts.
+  float metersInViewY = cameraAndSunState[2];
+  r = metersInViewY < 1e7 ? r : kPlanetRadius;
+  float muS = dot(zenithDirAtmo, sunDirAtmo);
+  outSunRadiance = atmoTex(r, muS).rgb;
+
+  // Computes the irradiance due to the sky dome (excluding the Sun).
+  vec3 skyIrradiance = skyTex(r, muS);
+
+  float night = smoothstep(0.0, 0.2, -muS);
+
+#ifdef ENABLE_MESH_LIGHTING
+  // Scalar product between the mesh normal and the sun direction, to compute
+  // the lighting. Since the base texture already contains lighting baked in
+  // (from the time the photo was taken), we are essentially applying lighting
+  // twice here. In some cases, like when the simulated sun direction
+  // corresponds to the actual sun direction when the texture was captured, we
+  // get very increased contrasts between lit and shadowed areas, which don't
+  // look natural. To mitigate this effect, we reduce the contrast due to the
+  // simulated lighting by using the mid vector between the normal and the
+  // vertical vector (which means averaging nDotL and muS). But this is a hack.
+  // The real fix would be to "undo" the lighting and shadows from the base
+  // texture in a preprocess pass, to recover the albedo, but this is really
+  // hard to do...
+  float nDotL = (dot(normalAtmo, sunDirAtmo) + muS) * 0.5;
+#else
+  // Use the vertical vector instead of the mesh normal for lighting.
+  float nDotL = muS;
+#endif
+  // The radiance reflected at posAtmo by the ground (Lambertian BRDF).
+  outSunIrradiance = max(nDotL, 0.0) * outSunRadiance;
+  outSkyIrradianceAndNight = vec4(skyIrradiance, night);
+#ifdef ENABLE_MOON_LIGHTING
+#ifdef ENABLE_MESH_LIGHTING
+  nDotL = dot(normalAtmo, moonDirAtmoTimesPhase);
+#else
+  // Use the vertical vector instead of the mesh normal for lighting.
+  nDotL = dot(zenithDirAtmo, moonDirAtmoTimesPhase);
+#endif
+  // We ignore clouds here, testing if the Moon is occluded by clouds or not
+  // would require another call to cloudOpacity, i.e. another texture fetch (and
+  // the result would not differ much since constrasts during night are quite
+  // low with our current settings).
+  outSkyIrradianceAndNight.rgb += kNightColor * max(nDotL, 0.0);
+#endif
+
+  // Uncomment this and comment the aerialPerspective call below to skip
+  // atmosphere shading.
+  //outTransmittance = vec3(1.0);
+  //outInscattering = vec3(0.0);
+  aerialPerspective(cameraAtmo, posAtmo, sunDirAtmo, uExposureAndAtmoTweak.x,
+                    outTransmittance, outInscattering);
+}
+#endif
+
+#if defined(FRAGMENT_SHADER)
+vec3 terrainShadingFS(
+    vec3 color, vec3 cameraAtmo, vec3 posAtmo, vec3 sunDirAtmo,
+    vec3 sunIrradiance, vec4 skyIrradianceAndNight,
+    vec3 transmittance, vec3 inscattering, vec3 sunRadiance) {
+#ifdef DISABLE_INSCATTER
+  skyIrradianceAndNight = vec4(vec3(skyIrradianceAndNight.b), 0.0);
+  transmittance = vec3(1.0);
+  inscattering = vec3(0.0);
+#endif
+
+  vec3 zenithDirAtmo = normalize(posAtmo);
+#ifdef ENABLE_WATER_LIGHTING
+  vec3 reflectedSunRadiance;
+  vec3 reflectedSkyRadiance;
+  // The radiance reflected at posAtmo by the water.
+  vec3 viewDirAtmo = normalize(cameraAtmo - posAtmo);
+  waterRadiance(viewDirAtmo,
+                zenithDirAtmo,
+                sunDirAtmo,
+                kMaxWaveSlopeVariance,
+                sunRadiance,
+                skyIrradianceAndNight.rgb, 1.0,
+                reflectedSunRadiance, reflectedSkyRadiance);
+  // Detects the water areas using the color components in HSV space (add some
+  // blue first to the color to also detect very dark areas).
+  const vec3 kColorOffset = vec3(0.0, 5.0, 15.0) / 255.0;
+  vec3 base = color + kColorOffset;
+  vec2 diff = base.bg - base.rr;
+  bool b1 = all(greaterThan(vec2(0.77, base.b), base.bg));
+  bool b2 = all(
+      greaterThan(diff.rgr, vec3(base.b * 0.35, 0.0, diff.g * 1.6666)));
+  float waterA = all(bvec2(b1, b2)) ? waterParams.y : 0.0;
+  // Eliminates false positive cases in Sahara.
+  waterA *= step(dot(posAtmo.xz, vec2(0.93, 0.37)), 0.98);
+#endif
+
+  // Computes the ground albedo, i.e. the proportion of incident ligth reflected
+  // by the ground, for each r,g,b wavelength, divided by pi. Ideally the ground
+  // texture would directly contain this physical quantity, but in fact it
+  // contains some uncalibrated values. Assuming that these values correctly
+  // represent the albedo, and that they are simply gamma corrected as in almost
+  // all images with a gamma value of 2.2, we can compute the albedo with a
+  // pow(color.rgb, 2.2) or approximate it with a square to avoid a costly pow
+  // function:
+  const float kMaxAlbedoOverPi = 0.55 / kPi;
+  vec3 albedoOverPi = color * color * kMaxAlbedoOverPi;
+#ifdef ENABLE_WATER_LIGHTING
+  // The 1.7 factor was manually tuned to get a sea color luminosity matching
+  // the luminosity of the blue color used for oceans in the keyhole imagery.
+  const vec3 kSeaAlbedoOverPi = 1.7 * kSeaFloorAlbedo / kPi;
+  albedoOverPi = mix(albedoOverPi, kSeaAlbedoOverPi, waterA);
+#endif
+
+#ifdef ENABLE_ECLIPSE_SHADER
+  float visibleSunFraction = sunVisibility(
+      eclipseOrigin, eclipseAxis, eclipseRadius, posAtmo);
+  sunIrradiance *= visibleSunFraction;
+  skyIrradianceAndNight.rgb *= visibleSunFraction;
+#else
+  float visibleSunFraction = 1.;
+#endif
+
+#ifdef ENABLE_CLOUD_SHADOWS
+  // Computes the attenuation of the sun light due to the clouds.
+  vec3 ignoredPos;
+  float shadow = cloudOpacity(posAtmo, sunDirAtmo, ignoredPos);
+  // Computes the cloud shadow from the cloud opacity, using an ad-hoc formula
+  // that increases the contrast of shadows.
+  shadow = 1.0 - min(1.0, 3.0 * shadow);
+#else
+  const float shadow = 1.0;
+#endif
+
+  // Tweaks the sky irradiance to avoid a dark ground during night.
+  vec3 gSkyIrradiance =
+      max(skyIrradianceAndNight.rgb, kNightColor * skyIrradianceAndNight.a);
+
+  // The radiance reflected at posAtmo by the ground (Lambertian BRDF).
+  vec3 groundL =
+      albedoOverPi * (sunIrradiance * shadow + gSkyIrradiance);
+
+#ifdef ENABLE_WATER_LIGHTING
+  if (waterA > 0.0) {
+    groundL += (reflectedSunRadiance * shadow * visibleSunFraction +
+                reflectedSkyRadiance) * waterParams.x;
+  }
+#endif
+
+#ifndef ENABLE_ATMOSPHERE_TWEAK
+  // At night, desaturate colors by 75% and shift them towards blue.
+  const vec3 kLuminanceFromRgb = vec3(0.2126, 0.7152, 0.0722);
+  const vec3 kBlueShift = vec3(0.874, 0.874, 2.622);
+  float groundLuminance = dot(groundL, kLuminanceFromRgb);
+  groundL = mix(groundLuminance * kBlueShift, groundL,
+      1.0 - 0.75 * skyIrradianceAndNight.a);
+#endif
+
+  float muS = dot(zenithDirAtmo, sunDirAtmo);
+
+  vec4 cloudLA = vec4(0.0);
+#ifdef ENABLE_CLOUD_SHADER
+  // ENABLE_CLOUD_SHADER should only be enabled if eye is above the clouds.
+  if (cameraAndSunState.x > cloudAltitudeOpacityAlbedoAndFading.x) {
+    // Computes the radiance reflected by the clouds, and their opacity, at the
+    // intersection of the view ray with the clouds layer.
+    vec3 viewDirAtmo = normalize(cameraAtmo - posAtmo);
+#ifdef APPROXIMATE_CLOUD_SHADING
+    // Reuses the Sun radiance and the sky irradiance illuminating the ground to
+    // compute the cloud radiance, to save computations. This approximation is
+    // quite good when looking mostly straight down. Otherwise separate Sun
+    // radiance and sky irradiance values must be computed at the intersection
+    // of the view ray with the cloud layer, which is done in the 'else' part
+    // below.
+    cloudLA = cloudRadianceAndOpacity(
+        viewDirAtmo, posAtmo, muS, sunRadiance, skyIrradianceAndNight.rgb);
+#else
+    // Here we should normally use the visible Sun fraction at the intersection
+    // of the view ray with the clouds. We use the value already computed at the
+    // ground level to save computations.
+    cloudLA = cloudRadianceAndOpacity(
+        viewDirAtmo, posAtmo, sunDirAtmo, visibleSunFraction);
+#endif
+    // Composites the radiances reflected by the ground and by the clouds.
+    // Note that we use an approximation here: normally the ground radiance
+    // should be modified by the aerial perspective first, and likewise for the
+    // clouds radiance, using a different aerial perspective value since the
+    // clouds are not at the same altitude than the ground - in practice there
+    // is less inscattering and less attenuation. Then these modified radiances
+    // could be composited and finally tone mapped. Here we approximate the
+    // aerial perspective for the clouds by the one for the ground, which saves
+    // a *lot* of computations (but gives clouds which become too red near the
+    // horizon, even when the sun is at the zenith, because our approximation
+    // overestimates the atmospheric attenuation for the clouds).
+    groundL = mix(groundL, cloudLA.rgb, cloudLA.a);
+  }
+#endif
+
+#ifdef ENABLE_CITY_LIGHT_SHADER
+  // The maximum radiance of the city lights.
+  const vec3 kMaxCityLightRadiance = vec3(0.01, 0.01, 0.005) * 6.0;
+  // The intensity of the city lights, from 0 during the day to 1 at night.
+  float cityLightIntensity = clamp(-muS * 5.0, 0.0, 1.0);
+  // Multiplies the city lights intensity by the cloud transparency (normally
+  // 1 minus the opacity, but we boost this a bit here; this boost is necessary
+  // to compensate the over exaggerated city light intensity; this also explains
+  // why we add the city lights here, instead of adding them before compositing
+  // the ground radiance with the cloud radiance as we normally should).
+  cityLightIntensity *= max(1.0 - 1.25 * cloudLA.a, 0.0);
+  // Adds the city lights to the radiance reflected by the ground.
+  groundL += kMaxCityLightRadiance * (textureCube(cityLightSampler, posAtmo).g *
+      cityLightIntensity * cityLightFading);
+#endif
+
+  vec3 pixelL = groundL * transmittance + inscattering * visibleSunFraction;
+  return toneMapping(pixelL, uExposureAndAtmoTweak.x);
+}
+#endif
+
+#if defined(VERTEX_SHADER) && defined(FRAGMENT_SHADER)
+// Not currently used, but shows how shading is split across vertex/fragment
+// shaders.
+vec3 terrainShading(vec3 color, vec3 cameraAtmo, vec3 posAtmo, vec3 normalAtmo,
+                    vec3 sunDirAtmo) {
+  vec3 sunIrradiance;
+  vec3 sunRadiance;
+  vec4 skyIrradianceAndNight;
+  vec3 transmittance;
+  vec3 inscattering;
+  terrainShadingVS(cameraAtmo, posAtmo, normalAtmo, sunDirAtmo,
+                   sunIrradiance, skyIrradianceAndNight,
+                   transmittance, inscattering, sunRadiance);
+
+  return terrainShadingFS(
+      color, cameraAtmo, posAtmo, sunDirAtmo, sunIrradiance,
+      skyIrradianceAndNight, transmittance, inscattering,
+      sunRadiance);
+}
+#endif

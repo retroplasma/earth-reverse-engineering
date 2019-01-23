@@ -1,0 +1,250 @@
+/**
+ * @license
+ * Real-time Realistic Ocean Lighting
+ * using Seamless Transitions from Geometry to BRDF
+ * Copyright (c) 2009 INRIA
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holders nor the names of its
+ *    contributors may be used to endorse or promote products derived from
+ *    this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+// Original code almost completely rewritten to make it work with OpenGL ES 2.0.
+// Copyright 2011 Google Inc. All Rights Reserved.
+// Author: ebruneton@google.com (Eric Bruneton)
+
+// Compiler directive for //maps/shared/glsl/compiler
+//! MODE APPROXIMATE_WATER_SHADING
+//! MODE USE_ACCURATE_MEAN_FRESNEL
+//! MODE USE_ACCURATE_WATER_BRDF
+//! COMMON
+
+// -----------------------------------------------------------------------------
+// CONSTANTS
+// -----------------------------------------------------------------------------
+
+// The distance from the Earth center at which we can switch from water meshes
+// with bump mapped water waves to terrain meshes with ground + water BRDF
+// shader. This distance is expressed in "Earth unit" (1 EU = 1 Earth radius).
+const float kMaxWaterShaderRadius = 1.1;
+
+// The inverse sizes in EU^-1 of the four water wave slope textures (packed in
+// two textures each containing two xy slopes).
+// The sizes in meters of the four wave slopes patterns.
+const vec4 kWaveSlopesPatternSize =
+    vec4(1077.56537, 153.93791, 21.99113, 3.14159);
+const vec4 kGridScale = 6360000.0 / kWaveSlopesPatternSize;
+
+// The scale factors for the waveSlopesSampler12 (see waveSlopesSampler12).
+const vec4 kWaveSlopesScale12 =
+    vec4(0.062286, 0.053192, 0.586914, 0.394043);
+
+// The scale factors for the waveSlopesSampler34 (see waveSlopesSampler34).
+const vec4 kWaveSlopesScale34 =
+    vec4(0.740234, 0.618652, 0.569336, 0.54834);
+
+// The albedo of the sea floor (unitless).
+const vec3 kSeaFloorAlbedo = vec3(0.00392, 0.01568, 0.04705);
+
+// -----------------------------------------------------------------------------
+// UNIFORMS
+// -----------------------------------------------------------------------------
+
+// The Sun direction in Water coordinates (unit vector).
+uniform vec3 sunDirWater;
+
+// The offsets to be used to access the first and second wave patterns, in the
+// xy and zw coordinates respectively, accounting for wave movement and camera
+// movement compensation.
+uniform vec4 waveSlopes12Uv0;
+
+// The offsets to be used to access the third and fourth wave patterns, in the
+// xy and zw coordinates respectively, accounting for wave movement and camera
+// movement compensation.
+uniform vec4 waveSlopes34Uv0;
+
+// The water waves slopes in x and y direction, for the first and second parts
+// of the wave height spectrum. The actual wave slope values can be obtained
+// from the texel values as follows:
+//   slopes = (texture2D(waveSlopesSampler12, ...) - 0.5) * kWaveSlopesScale12;
+uniform sampler2D waveSlopesSampler12;
+
+// The water waves slopes in x and y direction, for the third and fourth parts
+// of the wave height spectrum. The actual wave slope values can be obtained
+// from the texel values as follows:
+//   slopes = (texture2D(waveSlopesSampler34, ...) - 0.5) * kWaveSlopesScale34;
+uniform sampler2D waveSlopesSampler34;
+
+// -----------------------------------------------------------------------------
+// RENDERING FUNCTIONS
+// -----------------------------------------------------------------------------
+
+// Returns the unit normal to the water waves at 'posWater', defined in water
+// space. The normal is returned in water space. It is computed from the water
+// slopes textures. The water coordinate system is centered on the Earth and
+// its z axis is pointing towards the camera. Its unit of length is one Earth
+// radius.
+vec3 waveNormalWater(vec3 posWater) {
+  const vec2 kOneHalf = vec2(127.0 / 255.0);
+  const vec2 kOffset = kOneHalf * (kWaveSlopesScale12.xy +
+      kWaveSlopesScale12.zw + kWaveSlopesScale34.xy + kWaveSlopesScale34.zw);
+  vec4 uv12 = posWater.xyxy * kGridScale.xxyy + waveSlopes12Uv0;
+  vec4 uv34 = posWater.xyxy * kGridScale.zzww + waveSlopes34Uv0;
+  vec2 t1 = texture2D(waveSlopesSampler12, uv12.xy).xy * kWaveSlopesScale12.xy;
+  vec2 t2 = texture2D(waveSlopesSampler12, uv12.zw).zw * kWaveSlopesScale12.zw;
+  vec2 t3 = texture2D(waveSlopesSampler34, uv34.xy).xy * kWaveSlopesScale34.xy;
+  vec2 t4 = texture2D(waveSlopesSampler34, uv34.zw).zw * kWaveSlopesScale34.zw;
+  // Computes the *opposite* of the water slopes at 'posWater'.
+  vec2 waterSlopes = posWater.xy / posWater.z;
+  waterSlopes -= t1 + t2 + t3 + t4 - kOffset;
+  return normalize(vec3(waterSlopes, 1.0));
+}
+
+const float kMaxWavelength = 0.003;
+const float kWaveSlopeVarianceA = 0.630;
+const float kWaveSlopeVarianceB = -5.974;
+const float kMaxWaveSlopeVariance = 0.016584; // = (kWaveSlopeVarianceA +
+//    kWaveSlopeVarianceB * sqrt(kMaxWavelength)) * sqrt(kMaxWavelength);
+
+// Returns the variance of the wave slopes, i.e. the average of the square of
+// the wave slopes, due to all the waves whose wavelength is smaller than
+// maxWavelength (in kilometers). This variance depends on the wave spectrum,
+// and is precomputed and fitted with a simple function.
+float waterWaveSlopeVariance(float maxWavelength) {
+  float x = sqrt(min(maxWavelength, kMaxWavelength));
+  return (kWaveSlopeVarianceA + kWaveSlopeVarianceB * x) * x;
+}
+
+// Returns the average of the water Fresnel reflection coefficient for a viewer
+// in the direction 'viewDir' and a normal to the water waves 'waterNormal' (all
+// the vectors must be normalized and given in the same reference frame, which
+// can be arbitrary). The variance of the wave slopes, i.e. the average of the
+// square of the wave slopes, due to all the waves whose wavelength is smaller
+// than the pixel footprint on the water, must be given in 'slopeVariance'.
+float waterMeanFresnel(float viewDirDotNormal, float slopeVariance) {
+  float mu = 1.0 - viewDirDotNormal;
+#ifdef USE_ACCURATE_MEAN_FRESNEL
+  // See "Real-time Realistic Ocean Lighting using Seamless Transitions from
+  // Geometry to BRDF", E. Bruneton, F. Neyret and N. Holzschuch, Eurographics
+  // 2010 (section 5.2 "Average Fresnel reflectance").
+  float slopeStandardDeviation = sqrt(slopeVariance);
+  float slopeVariancePow1dot5 = slopeVariance * sqrt(slopeStandardDeviation);
+  float numerator = pow(mu, 5.0 * exp(-2.69 * slopeStandardDeviation));
+  float denominator = 1.0 + 22.7 * slopeVariancePow1dot5;
+  return numerator / denominator;
+#else
+  // Schlick's formula (simpler and more efficient but less accurate).
+  float mu2 = mu * mu;
+  return mu2 * mu2 * mu;
+#endif
+}
+
+// Returns the water specular component BRDF evaluated for the view direction
+// 'viewDir', surface normal 'waterNormal' and source direction 'sunDir', and
+// assuming that the variance of the wave slopes, i.e. the average of the square
+// of the wave slopes, due to all the waves whose wavelength is smaller than the
+// pixel footprint on the water, is 1.0 / 'invSlopeVariance'. All the vectors
+// must be normalized and given in the same reference frame, which can be
+// arbitrary.
+float waterBrdf(vec3 viewDir, vec3 waterNormal, float viewDirDotNormal,
+                vec3 sunDir, float invSlopeVariance) {
+  // The following code computes the Ward BRDF model (see "Measuring and
+  // modeling anisotropic reflection", G. J. Ward, SIGGRAPH 1992) with a Schlick
+  // model for the Fresnel specular reflectance (see "An Inexpensive BRDF Model
+  // for Physically-based Rendering". C. Schlick, CGF 1994).
+  vec3 halfVector = normalize(sunDir + viewDir);
+  float hn = dot(halfVector, waterNormal);
+#ifdef APPROXIMATE_WATER_SHADING
+  // This approximate model is faster but the approximations are acceptable only
+  // when the camera is looking almost straight down, and when the Sun is almost
+  // at the zenith (then the Fresnel coefficient is almost at its minimum).
+  const float kMinFresnelOver4Pi = 0.02 / (4.0 * kPi);
+  float p0 = kMinFresnelOver4Pi * invSlopeVariance;
+#else
+  float c = 1.0 - dot(viewDir, halfVector);
+  float c2 = c * c;
+  float fresnel = 0.02 + 0.98 * c2 * c2 * c;
+  const float oneOver4Pi = 1.0 / (4.0 * kPi);
+  float p0 = fresnel * oneOver4Pi * invSlopeVariance;
+#endif
+  // The following line is an approximation deriving from the exact value
+  // (commented out), using the fact that 1/(x*x)-1 ~ 2*(1-x) for x ~ 1:
+  // float p = exp(-(1.0 / (hn * hn) - 1.0) * invSlopeVariance) * p0;
+  float p = exp((-2.0 * invSlopeVariance) * (1.0 - hn)) * p0;
+  // Returns the Ward BRDF times the dot product of sunDir and waterNormal.
+#ifdef USE_ACCURATE_WATER_BRDF
+  float muS = max(dot(sunDir, waterNormal), 0.01);
+  float mu = max(viewDirDotNormal, 0.01);
+  return p * sqrt(muS / mu);
+#else
+  return p;
+#endif
+}
+
+void waterRadiance(vec3 viewDir, vec3 waterNormal, vec3 sunDir,
+                   float waveSlopeVariance, vec3 sunRadiance,
+                   vec3 skyIrradiance, float tweak,
+                   out vec3 outReflectedSunRadiance,
+                   out vec3 outReflectedSkyRadiance) {
+  float viewDirDotNormal = dot(viewDir, waterNormal);
+  float sunR = waterBrdf(viewDir, waterNormal, viewDirDotNormal, sunDir,
+                         1.0 / waveSlopeVariance) * tweak;
+#ifdef APPROXIMATE_WATER_SHADING
+  // This approximate model is faster but the approximations are acceptable only
+  // when the camera is looking almost straight down, and when the Sun is almost
+  // at the zenith (then the Fresnel coefficient is almost at its minimum).
+  const vec3 kSeaFloorAlbedoOverPi = kSeaFloorAlbedo / kPi;
+  outReflectedSunRadiance = sunR * sunRadiance;
+  outReflectedSkyRadiance = kSeaFloorAlbedoOverPi * skyIrradiance;
+#else
+  // Computes the water reflectance and transmittance coefficients.
+  const float kOneOverPi = 1.0 / kPi;
+  vec3 skyR = vec3(waterMeanFresnel(viewDirDotNormal, waveSlopeVariance));
+  vec3 seaT = (1.0 - skyR) * kSeaFloorAlbedo;
+  // The reflected Sun and sky radiances and transmitted sea bottom radiance.
+  outReflectedSunRadiance = sunR * sunRadiance;
+  outReflectedSkyRadiance = (skyR + seaT) * skyIrradiance * kOneOverPi;
+#endif
+}
+
+// Returns the total radiance reflected by the water in the direction 'viewDir'
+// when the normal to the water waves is 'waterNormal' and the Sun is in
+// direction 'sunDir' (all the vectors must be normalized and given in the same
+// reference frame, which can be arbitrary). The variance of the wave slopes,
+// i.e. the average of the square of the wave slopes, due to all the waves whose
+// wavelength is smaller than the pixel footprint on the water surface, must be
+// given in 'waterSlopeVariance'. The incident Sun radiance and the irradiance
+// due to the sky dome must be given in 'sunRadiance' and 'skyIrradiance'.
+// The tweak variable controls the Sun glint intensity. To get physically
+// correct results, set its value to 1.0.
+vec3 waterRadiance(vec3 viewDir, vec3 waterNormal, vec3 sunDir,
+                   float waveSlopeVariance, vec3 sunRadiance,
+                   vec3 skyIrradiance, float tweak) {
+  vec3 reflectedSunRadiance;
+  vec3 reflectedSkyRadiance;
+  waterRadiance(viewDir, waterNormal, sunDir, waveSlopeVariance, sunRadiance,
+                skyIrradiance, tweak, reflectedSunRadiance,
+                reflectedSkyRadiance);
+  return reflectedSunRadiance + reflectedSkyRadiance;
+}

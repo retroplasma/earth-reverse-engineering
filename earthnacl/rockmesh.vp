@@ -1,0 +1,241 @@
+// Don't replace these #endif/#if with #elif - this is a workaround for Mali 400
+// preprocessor bug.
+uniform mat4 uModelviewMatrix;
+uniform mat4 uProjectionMatrix;
+uniform vec3 uWorldOriginInEye;
+attribute vec4 aPosition;
+#if defined(AGGREGATE)
+uniform vec2 uAtlasHalfTexel;
+uniform mat4 uMeshToWorldMatrixArray[UNIFORM_ARRAY_SIZE];
+// rect == (min[0], min[1], size[0], size[1])
+uniform vec4 uTexCoordRectArray[STRIPS_PER_MESH * UNIFORM_ARRAY_SIZE];
+attribute float aMeshToWorldMatrixIndex;
+// TODO(b/31443017): Despite we only use the first component of
+// aTexCoordRectIndex, we declare it as a 2-vector here in order to avoid a
+// uint16 size gap in the vertex data layout (see TerrainAggVertex in
+// rockaggregate.cc). This is due to a Windows AMD OpenGL driver bug that
+// appears to make glDrawElements 10x longer when such gap exists.
+attribute vec2 aTexCoordRectIndex;
+varying float vUnpopOpacity;
+varying vec4 vTexCoordRect;  // (min[0], min[1], max[0], max[1])
+#else
+uniform mat4 uMeshToWorldMatrix;
+#endif
+// Define uniforms, attributes, and varyings based on render mode.
+#if !defined(WIREFRAME)
+attribute vec2 aTexCoord;
+varying vec2 vTexCoord;
+#if defined(ENABLE_ROCK_NORMALS)
+attribute vec3 aNormal;
+#endif
+#endif  // #if !defined(WIREFRAME)
+#if defined(DRAPED)
+attribute vec4 aDrapedTexCoord_LayerId;
+uniform mat4 uDrapedProjModelviewMatrix;
+uniform vec3 uDrapedEye;
+uniform vec4 uDrapedTextureInsetOffsetScale;
+varying vec4 vDrapedTexCoord_DoDrape;
+#if defined(ENABLE_ROCK_NORMALS)
+varying vec2 vDrapedDot;
+#else
+varying float vDrapedDot;
+#endif
+#if defined(AGGREGATE)
+uniform vec3 uDrapedDpOffsetArray[UNIFORM_ARRAY_SIZE];
+#else
+uniform vec2 uNoDraw_NoDrapeLayer;
+uniform vec3 uDrapedDpOffset;
+#endif  // #else defined(AGGREGATE)
+#endif  // #if defined(DRAPED)
+
+#if defined(ENABLE_ATMOSPHERE)
+$input "terrainatmo.vp"
+#endif  // #if defined(ENABLE_ATMOSPHERE)
+#if defined(NOTERRAIN_TEXTURE)
+$input "depthpush.glsllib"
+#endif  // if defined(NOTERRAIN_TEXTURE)
+
+#if defined(MIRTH_CLIENT_INJECTED_SHADER_CODE)
+uniform vec3 uEyePos;
+varying vec3 vWorldPos;
+varying float vPosLatitude;
+varying float vPosAltitude;
+#endif // #if defined(MIRTH_CLIENT_INJECTED_SHADER_CODE)
+
+// Returns mesh to eye coordinates matrix and vec3 of octant and layers masks.
+mat4 ComputeMeshToEyeMatrixAndMasks(out vec3 masks) {
+  float octant_mask, nodraw_layer, nodrape_layer;
+  // We hijack the boring part of the matrix with octant_mask and vUnpopOpacity.
+#if defined(AGGREGATE)
+  mat4 mesh_to_world_matrix =
+      uMeshToWorldMatrixArray[int(aMeshToWorldMatrixIndex)];
+  vUnpopOpacity = mesh_to_world_matrix[2][3];
+#else
+  mat4 mesh_to_world_matrix = uMeshToWorldMatrix;
+#endif
+  octant_mask = mesh_to_world_matrix[3][3];
+
+#if defined(DRAPED)
+#if defined(AGGREGATE)
+  nodraw_layer = mesh_to_world_matrix[1][3];
+  nodrape_layer = mesh_to_world_matrix[0][3];
+#else
+  nodraw_layer = uNoDraw_NoDrapeLayer.x;
+  nodrape_layer = uNoDraw_NoDrapeLayer.y;
+#endif  // #else defined(AGGREGATE)
+#endif  // #if defiend(DRAPED)
+
+  // Right hand column is hijacked for masks and draping info so reset here.
+  mesh_to_world_matrix[0][3] = 0.;
+  mesh_to_world_matrix[1][3] = 0.;
+  mesh_to_world_matrix[2][3] = 0.;
+  mesh_to_world_matrix[3][3] = 1.;
+
+  masks = vec3(octant_mask, nodraw_layer, nodrape_layer);
+  return uModelviewMatrix * mesh_to_world_matrix;
+}
+
+// Returns 0.0 if the vertex is masked out, or 1.0 if the vertex isn't masked.
+float ComputeMasking(in vec3 masks) {
+  // Filter out octants according to the octant mask stored in |masks.x|.
+  // aPosition.w contains an encoding of the octant of the current vertex.
+  float fract_mask = masks.x / (aPosition.w * 2.);
+  float mask = floor((fract_mask - floor(fract_mask)) * 2.);
+
+#if defined(DRAPED)
+  float layer_id = aDrapedTexCoord_LayerId.w;
+  // NOTE:
+  //   masks.y == nodraw_layer == uNoDraw_NoDrapeLayer.x
+  //   masks.z == nodrape_layer == uNoDraw_NoDrapeLayer.y
+  //
+  // TODO(johnan): It seems like masks.z has more frame-to-frame variation in it
+  // than I'd expect...  Load poly_altitudemodes_water_on.kml, fly to Santa
+  // Cruz, and note that the buildings layer draping flickers on/off
+  // semi-randomly while tilting the camera around.
+  vDrapedTexCoord_DoDrape.w = layer_id > masks.z ? 1. : 0.;
+  mask = layer_id != masks.y ? mask : 0.;
+#endif
+
+  return mask;
+}
+
+void ComputeTexCoords(in vec4 pos_in_eye) {
+#if defined(DRAPED)
+  vec3 dp_offset;  // = uDrapedDpOrigin - uDrapedEye
+#if defined(AGGREGATE)
+  dp_offset = uDrapedDpOffsetArray[int(aMeshToWorldMatrixIndex)];
+#else
+  dp_offset = uDrapedDpOffset;
+#endif
+  vec3 pos_in_offset = aDrapedTexCoord_LayerId.xyz + dp_offset;
+  // pos_in_world is also the normal since aDrapedTexCoords are on unit sphere.
+  vec3 pos_in_world = pos_in_offset + uDrapedEye;
+  // vec3 drape_view_dir = normalize(pos_in_world - uDrapedEye) -->
+  vec3 drape_view_dir = normalize(pos_in_offset);
+  // Compute dot product of drape camera view direction with draped texcoord so
+  // we can reject fragments which are backfacing wrt the drape camera.  For
+  // overground layer, compute dot of vertex normal with "sky" vector so dot ==
+  // 1 for horizontal surface. In the fragement shader we limit draping to dots
+  // of >= .7 so we drape on mostly flat overground surfaces which includes
+  // bridges, overpasses and tops of buildings. No need to normalize vector
+  // transform since uModelviewMatrix is expected to be only rotations.
+#if defined(ENABLE_ROCK_NORMALS)
+  vDrapedDot.x = dot(pos_in_world, drape_view_dir);
+  float layer_id = aDrapedTexCoord_LayerId.w;
+  vDrapedDot.y = layer_id == 0. ?  // 0 is kOvergroundLayerId.
+      dot((uModelviewMatrix * vec4(aNormal, 0.)).xyz,
+          normalize(pos_in_eye.xyz - uWorldOriginInEye)) : 1.;
+#else
+  vDrapedDot = dot(pos_in_world, drape_view_dir);
+#endif
+
+  vec4 draped_tex_coord = uDrapedProjModelviewMatrix * vec4(pos_in_offset, 1.);
+  // So texture2DProj does divide by w to give us NDC or -1 to 1 which
+  // doesn't work so well with textures that expect 0-1. The following gives
+  // us 0-1 after perspective divide:
+  // s' / w = (s / w + 1) / 2, s' = (s + w) / 2
+  // s' / w = (s / w + 1) / 2 * scale + offset
+  // s' = (s + w) / 2 * scale + offset * w
+  vec2 ww = vec2(draped_tex_coord.w);
+  vDrapedTexCoord_DoDrape.st =
+      (draped_tex_coord.st + ww) * .5 * uDrapedTextureInsetOffsetScale.zw +
+      ww * uDrapedTextureInsetOffsetScale.xy;
+  // Remember w for texture2DProj().
+  vDrapedTexCoord_DoDrape.z = draped_tex_coord.w;
+#endif  // DRAPED
+
+#if defined(AGGREGATE)
+  vec4 tex_coord_rect = uTexCoordRectArray[int(aTexCoordRectIndex.x)];
+  // Scale 0-1 to tex_coord_rect to index into atlas.
+  vTexCoord = aTexCoord * tex_coord_rect.zw + tex_coord_rect.xy;
+  // From min/size to min/max.
+  vTexCoordRect = vec4(tex_coord_rect.xy + uAtlasHalfTexel,
+                       tex_coord_rect.xy + tex_coord_rect.zw - uAtlasHalfTexel);
+#else
+#if !defined(WIREFRAME)
+  vTexCoord = aTexCoord;
+#endif
+#endif
+}
+
+#if defined(MIRTH_CLIENT_INJECTED_SHADER_CODE)
+vec3 ComputeWorldPos(in vec3 eye_position) {
+  // Because uMeshToWorldMatrix is actually encoded with eye position in it, we
+  // need to add the eye position back.
+  return (uMeshToWorldMatrix * vec4(aPosition.xyz, 1.)).xyz + eye_position;
+}
+
+// Taken from mirth/core/geodesy/srs.cc GetLlaFromXyz().
+float ComputeLatitude(in vec3 world_pos) {
+  float m_1_pi = 0.31830988618379067154;
+  float len = sqrt(world_pos.z * world_pos.z + world_pos.x * world_pos.x);
+  return atan(world_pos.y, len) * m_1_pi;
+}
+
+float ComputeAltitude(in vec3 world_pos) {
+  // 6371010 is radius of the earth.
+  return (length(world_pos) - 1.) * 6371010.;
+}
+#endif
+
+void main() {
+  vec3 masks;
+  mat4 mesh_to_eye_matrix = ComputeMeshToEyeMatrixAndMasks(masks);
+  // Transform into eye coordinates.
+  vec4 pos_in_eye = mesh_to_eye_matrix * vec4(aPosition.xyz, 1.);
+
+#if defined(MIRTH_CLIENT_INJECTED_SHADER_CODE)
+  vWorldPos = ComputeWorldPos(uEyePos);
+  vPosLatitude = ComputeLatitude(vWorldPos);
+  vPosAltitude = ComputeAltitude(vWorldPos);
+#endif
+
+#if defined(ENABLE_ATMOSPHERE)
+#if defined(ENABLE_LIGHTING) && defined(ENABLE_ROCK_NORMALS)
+  // Convert from Earth Keyhole coordinates to ECEF/atmo coordinates.
+  ComputeAtmosphereWithNormals(
+      pos_in_eye, vec3(-aNormal.z, -aNormal.x, aNormal.y));
+#else
+  ComputeAtmosphere(pos_in_eye);
+#endif
+#endif  // defined(ENABLE_ATMOSPHERE)
+  ComputeTexCoords(pos_in_eye);
+  // Project the point into clip space.
+  vec4 pos_in_clip = uProjectionMatrix * pos_in_eye;
+#if defined(WIREFRAME)
+  pos_in_clip.w *= 1.001;  // Bring in depth a bit so wireframe draws on top.
+#endif
+#if defined(NOTERRAIN_TEXTURE)
+  // Depth push the vertex to avoid the double blending between the visible
+  // part of the KML and the occluded part of the KML.
+  if (pos_in_clip.w != 0.) {
+    float abs_pos_in_clip_w = abs(pos_in_clip.w);
+    pos_in_clip.z = pos_in_clip.z / abs_pos_in_clip_w;
+    float depth_push = 5. / 6371010.;  // 5 meters.
+    pos_in_clip.z = GetPushedDepthInNdc(depth_push, pos_in_clip.z);
+    pos_in_clip.z *= abs_pos_in_clip_w;
+  }
+#endif  // if defined(NOTERRAIN_TEXTURE)
+  // Multiply by 1000.0 to work around mobile chipset bugs.
+  gl_Position = 1000.0 * pos_in_clip * ComputeMasking(masks);
+}

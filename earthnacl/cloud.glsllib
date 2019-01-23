@@ -1,0 +1,88 @@
+// Copyright 2011-2012 Google Inc. All Rights Reserved.
+// Author: ebruneton@google.com (Eric Bruneton)
+
+// This file defines functions to render clouds from a cubemap texture.
+
+//! INCLUDE atmosphere.glsllib
+//! MODE APPROXIMATE_CLOUD_SHADING
+//! COMMON
+
+// A texture of the clouds (containing opacity values).
+uniform samplerCube cloudsSampler;
+
+// The radius of the clouds layer (in planet radii), the maximum opacity of
+// the clouds, their albedo (divided by PI) and the cloud shader fading
+// coefficient.
+uniform vec4 cloudAltitudeOpacityAlbedoAndFading;
+
+// Computes the intersection between the clouds layer and the ray reaching
+// posAtmo and originating from dirAtmo, stores the result in 'cloudPos', and
+// returns the opacity of the clouds at this point.
+float cloudOpacity(vec3 posAtmo, vec3 dirAtmo, out vec3 cloudPos) {
+// First, computes the distance to the intersection point.
+  float cloudLayerRadius = cloudAltitudeOpacityAlbedoAndFading.x;
+#ifdef APPROXIMATE_CLOUD_SHADING
+  // Fast but approximate formula, using a flat planet model (invalid when
+  // posDotDir is near 0.0 or negative), and assuming that length(posAtmo) ==
+  // kPlanetRadius (which are valid hypothesis when the Sun is near the zenith
+  // and when the camera is very far from the ground).
+  float cloudLayerAltitude = cloudLayerRadius - kPlanetRadius;
+  float cloudDistance = cloudLayerAltitude / dot(posAtmo, dirAtmo);
+#else
+  // Exact but slower formula, using a spherical planet model (ignoring the case
+  // where the discriminant is negative).
+  float b = dot(posAtmo, dirAtmo);
+  float c = dot(posAtmo, posAtmo) - cloudLayerRadius * cloudLayerRadius;
+  float cloudDistance = sqrt(b * b - c) - b;
+#endif
+  // Then computes the intersection point, and lookup the texture at this place.
+  cloudPos = posAtmo + cloudDistance * dirAtmo;
+  float cloudOpacity = textureCube(cloudsSampler, cloudPos).g;
+  // Compensate the gamma of the texture to get a linear opacity value (the
+  // gamma of the texture is adjusted to 2 during preprocessing, instead of the
+  // usual 2.2 value, so that compensating it here does not require an expensive
+  // pow() function call.
+  cloudOpacity *= cloudOpacity;
+  // Fades out the cloud opacity depending on the camera altitude.
+  return cloudOpacity * cloudAltitudeOpacityAlbedoAndFading.w;
+}
+
+// Computes the radiance reflected by the clouds, and their opacity, at the
+// intersection of the view ray with the clouds layer. For this the Sun radiance
+// and the sky irradiance illuminating the clouds is computed, and then a basic
+// cloud BRDF model is used to get the reflected radiance.
+vec4 cloudRadianceAndOpacity(vec3 viewDirAtmo, vec3 posAtmo, vec3 sunDirAtmo,
+    float visibleSunFraction) {
+  vec3 cloudPos;
+  float cloudAlpha = cloudOpacity(posAtmo, viewDirAtmo, cloudPos);
+  // Computes the Sun radiance and the sly irradiance illuminating the clouds at
+  // 'cloudPos'.
+  float r = cloudAltitudeOpacityAlbedoAndFading.x;
+  float muS = dot(normalize(cloudPos), sunDirAtmo);
+  vec3 sunRadiance = atmoTex(r, muS).rgb * visibleSunFraction;
+  vec3 skyIrradiance = skyTex(r, muS) * visibleSunFraction;
+  // Tweaks the sky irradiance to avoid black clouds during night.
+  skyIrradiance = max(skyIrradiance, vec3(0.004, 0.0046, 0.0067));
+  // We suppose that all the clouds have the same albedo.
+  float cloudAlbedoOverPi = cloudAltitudeOpacityAlbedoAndFading.z;
+  // The radiance reflected by the clouds (using an ad-hoc, non physical BRDF).
+  float cloudBrdf = 0.25 + 0.75 * max(muS, 0.0);
+  return vec4(cloudAlbedoOverPi * (sunRadiance * cloudBrdf + skyIrradiance),
+      cloudAlpha * cloudAltitudeOpacityAlbedoAndFading.y);
+}
+
+// Computes the radiance reflected by the clouds, and their opacity, at the
+// intersection of the view ray with the clouds layer. An approximate value of
+// the Sun radiance and of the sky irradiance illuminating the clouds is
+// supposed to be already computed.
+vec4 cloudRadianceAndOpacity(vec3 viewDirAtmo, vec3 posAtmo, float muS,
+    vec3 sunRadiance, vec3 skyIrradiance) {
+  vec3 cloudPos;
+  float cloudAlpha = cloudOpacity(posAtmo, viewDirAtmo, cloudPos);
+  // We suppose that all the clouds have the same albedo.
+  float cloudAlbedoOverPi = cloudAltitudeOpacityAlbedoAndFading.z;
+  // The radiance reflected by the clouds (using an ad-hoc, non physical BRDF).
+  float cloudBrdf = 0.25 + 0.75 * max(muS, 0.0);
+  return vec4(cloudAlbedoOverPi * (sunRadiance * cloudBrdf + skyIrradiance),
+      cloudAlpha * cloudAltitudeOpacityAlbedoAndFading.y);
+}

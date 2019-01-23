@@ -1,0 +1,1186 @@
+/**
+ * @license
+ * Precomputed Atmospheric Scattering
+ * Copyright (c) 2008 INRIA
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holders nor the names of its
+ *    contributors may be used to endorse or promote products derived from
+ *    this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+// Original code almost completely rewritten to make it work with OpenGL ES 2.0.
+// Copyright 2011 Google Inc. All Rights Reserved.
+// Author: ebruneton@google.com (Eric Bruneton)
+
+// Compiler directive for //maps/shared/glsl/compiler
+//! MODE APPROXIMATE_AERIAL_PERSPECTIVE
+//! MODE FLOAT_TEXTURES
+//! MODE SIMPLE_TONE_MAPPING
+//! MODE MARS_ATMOSPHERE
+//! MODE VENUS_ATMOSPHERE
+//! MODE PLUTO_ATMOSPHERE
+//! COMMON
+
+// This file defines functions to render the sky and the aerial perspective.
+// These effects result from the atmospheric inscattering (i.e. the light which
+// is scattered towards the viewer by air molecules and particles along the view
+// ray) and the atmospheric transmittance (i.e. the transparency of the
+// atmosphere, which decreases with the distance due to outscattering, i.e.
+// light scattered out from the view ray by air molecules and particles).
+//
+// These effects can be rendered directly or indirectly:
+// - in the direct way the inscatterRadiance function is called for each pixel
+// of the final image.
+// - in the indirect way the inscatterRadiance function is called for each texel
+// of a small intermediate texture (via computeInscatter), which is then used by
+// the inscatter functions, called for each pixel of the final image.
+//
+// The direct way is the most precise method, but it is also the slowest. The
+// indirect way is based on the observation that the sky color and the aerial
+// perspective vary very slowly in the final image. Thus it seems possible to
+// greatly improve performance by computing the atmospheric effects only for a
+// small subset of pixels, and to interpolate the results for the remaining
+// pixels. This is indeed possible, but no so easy.
+//
+// A first subsampling method would be to compute the atmospheric effects per
+// vertex, using coarse sky and ground meshes. But this is quite hard, for two
+// reasons. First, our atmospheric rendering method needs access to precomputed
+// textures, but vertex shaders cannot use textures in OpenGL ES 2.0. Second,
+// and most importantly, there are areas where the atmosphere color changes
+// rapidly, like near the horizon, near the Sun, or near the terminator line.
+// To render these areas accurately, we would need a mesh with finer triangles
+// in these areas. But this is really not trivial. In particular, meshes
+// cannot ensure this property. We would need adaptively refined meshes, which
+// implies CPU costs and memory transfer costs from the CPU to the GPU.
+//
+// Another subsampling method would be to compute a small environment map at
+// each frame, for the current camera and Sun positions, for instance with a
+// cube map. Then the atmospheric effects could be rendered in the final image
+// with only one texture lookup per pixel into this environment map, which is
+// really fast. But the horizon, the terminator line and the areas near the Sun
+// are still a problem with this method: to get a good precision in these small
+// areas, a large cube map would be needed, as large or maybe even larger than
+// the screen, and performance would not be increeased.
+//
+// The solution is to use a distorted environment map with a highly non uniform
+// sampling of the view ray directions. The idea is to sample more the
+// directions near the horizon, the terminator line or the Sun, and to sample
+// less the other directions. This increases the complexity and the runtime
+// cost of the function used to convert a view direction into environment map
+// texture coordinates, but it allows us to use a very small environment map
+// texture, and thus to save many costly computations to generate it.
+//
+// Our indirect rendering method uses this distorted environment map idea. The
+// main challenge with this method is to find a distortion function with the
+// desired properties (i.e. a higher sampling rate near the horizon, near the
+// Sun, near the terminator line, and more generally in areas where the
+// atmosphere color changes rapidly). For this, our distortion function uses
+// the following view ray direction parameters:
+// - the view zenith angle cosinus mu. The horizon is then easily characterized
+// by mu = muHorizon = -sqrt(1-1/(r0*r0)), where r0 is the distance from the
+// camera to the planet center (relatively to the planet radius). We then map mu
+// to the vertical environment map coordinate v with the non linear mapping
+// defined in "Precomputed Atmospheric Scattering", Bruneton et al. EGSR 2008
+// (see the getMu and inverseGetMu functions below).
+// - the Sun zenith angle cosinus muS and the view Sun angle cosinus nu. Then
+// the terminator line corresponds to muS = 0, and the areas near the Sun to
+// nu ~= 1. Here we have two cases:
+//   * if the camera is inside the atmosphere, muS is constant and equal to
+//   muS0, the Sun zenith angle cosinus at the camera position and of the Sun
+//   direction. We then map nu to the horizontal environment map coordinate u
+//   with a sigmoid function to put more samples near nu = 1 (see the sigmoid
+//   and inverseSigmoid functions below).
+//   * if the camera is outside the atmosphere, muS is not constant (it is then
+//   defined at the entry point of the view ray in the atmosphere). But we have
+//   the relation muS = r0' * muS0 + t(r0',mu) * nu, where r0' is the distance
+//   from the camera to the planet center (relatively to the *atmosphere*
+//   radius), and t(r0',mu) is the distance from the camera to the view ray
+//   entry point inside the atmosphere (again, relatively to the *atmosphere*
+//   radius). This shows that muS is a function of nu (and vice-versa; r0', muS0
+//   and t are constant). We use this relation to find the possible range of
+//   values for muS, and map the relative position of muS in this range to the
+//   horizontal environment map coordinate u with the same sigmoid function as
+//   above (see the getMuSNu and inverseGetMuSNu functions below).
+//
+// The above indirect rendering algorithm is restricted to a perfectly spherical
+// planet, because it assumes that the distance from the camera to the ground
+// only depends on the camera altitude and on the view zenith angle (the direct
+// rendering algorithm does not have this problem). In reality the ground is not
+// perfectly spherical, and it is necessary to take the correct distance to the
+// ground into account to get realistic atmospheric effects. But this algorithm
+// can easily be extended to account for this: it suffice to use several
+// intermediate textures, storing the atmospheric transmittance and inscattering
+// for several predefined distances from the camera, and to use a piecewise
+// linear interpolation of these values during rendering, based on the actual
+// distance to the ground.
+// Using many predefined distances increases the final rendering quality, but
+// decreases performance because more time is needed to generate the
+// intermediate textures at each frame. In this implementation when use only two
+// predefined distances. These distances were carefully chosen to be "cheap" to
+// compute (they must be computed for each pixel of the final image, in order to
+// do the piecewise linear interpolation), to be continuous functions of the
+// view zenith angle (discontinuities lead to visual artefacts), and such that
+// the piecewise linear reconstruction using them provides a "reasonable"
+// approximation of the exact functions (see the getMaxDistances function
+// below).
+
+// -----------------------------------------------------------------------------
+// CONSTANTS
+// -----------------------------------------------------------------------------
+
+const float kPi = 3.141592657;
+
+// Deprecated.
+const float kEarthRadius = 1.0;
+
+// The radius of the planet in "planet unit" (1 PU = the planet radius).
+const float kPlanetRadius = 1.0;
+
+// If no specific atmosphere is specified, use the Earth atmosphere parameters.
+#if !defined(MARS_ATMOSPHERE) && !defined(VENUS_ATMOSPHERE) && !defined(PLUTO_ATMOSPHERE)
+
+// The radius of the planet in kilometers. The value comes from
+// "Precomputed Atmospheric Scattering" E. Bruneton et al (this value does not
+// need to be very precise).
+const float kPlanetRadiusInKm = 6360.0;
+
+// The inner radius of the atmosphere in planet unit (1 PU = the planet radius).
+// This should correspond to the lowest point on the surface of the planet. For
+// the Earth we use the lowest under water point so that we get some shading
+// under water when no specific under water shading is enabled.
+const float kInnerAtmosphereRadius = 6350.0 / kPlanetRadiusInKm;
+
+// The outer radius of the atmosphere in planet unit (1 PU = the planet radius).
+// The value comes from "Precomputed Atmospheric Scattering" E. Bruneton et al
+// (this value does not need to be very precise; it must be such that the
+// atmosphere density at this radius is "almost" zero).
+const float kOuterAtmosphereRadius = 6420.0 / kPlanetRadiusInKm;
+
+// Deprecated.
+const float kAtmosphereRadius = kOuterAtmosphereRadius;
+
+// The thickness of the atmosphere in planet unit (1 PU = the planet radius),
+// counting only the part that is above the average planet radius.
+const float kAtmosphereHeight = kOuterAtmosphereRadius - kPlanetRadius;
+
+// The square of the maximal distance from a point in the atmosphere to the
+// horizon, relatively to the square of the planet radius (unitless).
+const float kMaxHorizonDistSq =
+    kOuterAtmosphereRadius * kOuterAtmosphereRadius -
+    kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+
+// The maximal distance from a point in the atmosphere to the horizon, in planet
+// unit (1 PU = the planet radius).
+const float kMaxHorizonDist = 0.148657681; // = sqrt(kMaxHorizonDistSq);
+
+// The height scale in planet unit for the exponential decrease of the air
+// molecule density (for Rayleigh scattering - 1 PU = the planet radius).
+const float kRayleighScale = 8.0 / kPlanetRadiusInKm;
+
+// The Rayleight scattering coefficients, in PU^-1, for the R, G and B channels.
+// 1 PU = the planet radius. These are the scattering coefficients at
+// kPlanetRadius. The scattering coefficients at altitude h above kPlanetRadius
+// are given by (assuming a constant "under water" density):
+//   kRayleighScatteringCoefficient * exp(-max(h, 0) / kRayleighScale).
+// The values are taken from "Precomputed Atmospheric Scattering" E. Bruneton et
+// al.
+const vec3 kRayleighScatteringCoefficient =
+    vec3(5.8e-3, 1.35e-2, 3.31e-2) * kPlanetRadiusInKm;
+
+// The height scale in planet unit for the exponential decrease of the Mie
+// particles density (for Mie scattering - 1 PU = the planet radius).
+const float kMieScale = 1.2 / kPlanetRadiusInKm;
+
+// The Mie scattering coefficients, in PU^-1, for the R, G and B channels.
+// 1 PU = the planet radius. These are the scattering coefficients at
+// kPlanetRadius. The scattering coefficients at altitude h above kPlanetRadius
+// are given by kMieScatteringCoefficient * exp(-max(h, 0) / kMieScale).
+const vec3 kMieScatteringCoefficient = vec3(4e-3) * kPlanetRadiusInKm;
+
+// The Mie extinction coefficients, in PU^-1, for the R, G and B channels.
+// 1 PU = the planet radius.
+const vec3 kMieExtinctionCoefficient = kMieScatteringCoefficient / 0.9;
+
+// The Mie phase function coefficient (unitless).
+const float kMieG = 0.8;
+
+// The "multiple scattering coefficients", in PU^-1. See 'atmoSampler'.
+const vec3 kMultipleScatteringCoefficient =
+    vec3(2.09e-4, 4.76e-4, 1.385e-3) * kPlanetRadiusInKm;
+
+// The "sky irradiance coefficients" (unitless). See 'skySampler'.
+const vec3 kSkyIrradianceCoefficient =
+    vec3(0.031586, 0.063477, 0.129883) * 2.0;
+
+// One over the normalized color of a horizontal white surface at sunset, as
+// computed with our atmospheric model ("normalized color" meaning a color of
+// unit luminance).
+const vec3 kInverseWhitePoint = vec3(0.91, 0.99, 1.6);
+
+// The distance in PU at which the atmospheric transmittance becomes
+// almost null (for the purpose of computing the inscatter integral). Depends
+// on the above atmospheric parameters.
+const float kMaxInscatterDistance = 800.0 / kPlanetRadiusInKm;
+
+#endif
+
+// See above for the definition of these constants.
+// The values come from various sources:
+// - kRayleighScale and kRayleighScatteringCoefficient are deduced from
+// http://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html and
+// http://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html
+// using the 'scale height' and 'surface density' and using a proportionality
+// rule between the surface density and scattering coefficients to get the
+// scattering coefficients for Mars from those for the Earth.
+// - kMieScale comes from the abstract of
+// http://www.mps.mpg.de/homes/hoekzema/katman/nick/work/06novesa_valmar.pdf
+// - kMieScatteringCoefficient comes from the introduction of
+// http://www-mars.lmd.jussieu.fr/paris2011/abstracts/petrova_paris2011.pdf,
+// which states that the optical depth is between 0.3-0.7, with 0.5 being a
+// typical value. This value is equal to kMieScale * kMieExtinctionCoefficient
+// so we deduce that kMieExtinctionCoefficient should be of the order 0.5 / 14 =
+// 3.57e-2. http://www.sciencedirect.com/science/article/pii/S0019103507003156
+// states that the RGB albedo (for the ground+atmosphere) is 0.289,0.170,0.089.
+// Combining the two we take kMieExtinctionCoefficient equal to
+// 3.57e-2*(0.289,0.17,0.089)/((0.289+0.17+0.089)/3). In fact, for aesthetic
+// reasons, we use one third of this value (the "exact" value gives blue sunsets
+// as expected but also a very dark horizon artifact).
+// - kMieG comes from Fig. 6 (for lambda=500nm) in
+// http://www.opticsinfobase.org/oe/abstract.cfm?uri=oe-21-15-17972. The ratio
+// between kMieExtinctionCoefficient and kMieScatteringCoefficient comes from
+// Fig. 7 of this paper (where it is noted omega).
+
+#ifdef MARS_ATMOSPHERE
+
+const float kPlanetRadiusInKm = 3380.0;
+const float kInnerAtmosphereRadius = 3372.0 / kPlanetRadiusInKm;
+const float kOuterAtmosphereRadius = 3485.0 / kPlanetRadiusInKm;
+const float kAtmosphereRadius = kOuterAtmosphereRadius;
+const float kAtmosphereHeight = kOuterAtmosphereRadius - kPlanetRadius;
+const float kMaxHorizonDistSq =
+    kOuterAtmosphereRadius * kOuterAtmosphereRadius -
+    kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+const float kMaxHorizonDist = 0.260429152; // = sqrt(kMaxHorizonDistSq);
+const float kRayleighScale = 11.1 / kPlanetRadiusInKm;
+const vec3 kRayleighScatteringCoefficient =
+    vec3(9.53e-5, 2.218e-4, 5.44e-4) * kPlanetRadiusInKm;
+const float kMieScale = 14.0 / kPlanetRadiusInKm;
+const vec3 kMieScatteringCoefficient =
+    vec3(2.00e-2, 1.59e-2, 1.18e-2) * 0.33 * kPlanetRadiusInKm;
+const vec3 kMieExtinctionCoefficient = kMieScatteringCoefficient / 0.8;
+const float kMieG = 0.5;
+const vec3 kMultipleScatteringCoefficient =
+    vec3(1.326e-3, 7.39e-4, 3.74e-4) * kPlanetRadiusInKm;
+const vec3 kSkyIrradianceCoefficient = vec3(0.198730, 0.163208, 0.127075);
+const vec3 kInverseWhitePoint = vec3(1.0);
+const float kMaxInscatterDistance = 800.0 / kPlanetRadiusInKm;
+
+#endif  // #ifdef MARS_ATMOSPHERE
+
+// See above for the definition of these constants.
+// The values come from various sources:
+// - kRayleighScale and kRayleighScatteringCoefficient are deduced from
+// http://nssdc.gsfc.nasa.gov/planetary/factsheet/venusfact.html
+// using the 'scale height' and 'surface density' and using a proportionality
+// rule between the surface density and scattering coefficients to get the
+// scattering coefficients for Venus from those for the Earth.
+// From http://lasp.colorado.edu/~bagenal/3720/CLASS14/14EVM-5.html we see that
+// Venus has an optical depth of 98 compared to Earth's 0.6.
+// TODO (cdcorrea): Find out if this includes the cloud layer.
+// This value is equal to
+// kMieScale * kMieExtinctionCoefficient so we deduce that
+// kMieExtinctionCoefficient should be of the order 98 / 15.9 = 6.16. We use
+// a much smaller value of 4e-2 / 0.9 for aesthetic purposes, since otherwise
+// the surface of Venus is not visible at high altitude. If the 98 optical value
+// includes the clouds, then the atmosphere albedo should be much smaller.
+// The geometric albedo of Venus is 0.689 (compared to 0.434 for Earth).
+// TODO (cdcorrea): Adjust these values once we have a cloud layer for Venus,
+// if necessary.
+
+#ifdef VENUS_ATMOSPHERE
+
+const float kPlanetRadiusInKm = 6052.0;
+const float kInnerAtmosphereRadius = 6050.0 / kPlanetRadiusInKm;
+const float kOuterAtmosphereRadius = 6120.0 / kPlanetRadiusInKm;
+const float kAtmosphereRadius = kOuterAtmosphereRadius;
+const float kAtmosphereHeight = kOuterAtmosphereRadius - kPlanetRadius;
+const float kMaxHorizonDistSq =
+    kOuterAtmosphereRadius * kOuterAtmosphereRadius -
+    kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+const float kMaxHorizonDist = 0.1525; // = sqrt(kMaxHorizonDistSq);
+const float kRayleighScale = 15.9 / kPlanetRadiusInKm;
+const vec3 kRayleighScatteringCoefficient =
+    vec3(2.8e-3, 5.35e-4, 7.31e-5) * kPlanetRadiusInKm;
+const float kMieScale = 1.2 / kPlanetRadiusInKm;
+const vec3 kMieScatteringCoefficient = vec3(4e-2) * kPlanetRadiusInKm;
+const vec3 kMieExtinctionCoefficient = kMieScatteringCoefficient / 0.9;
+const float kMieG = 0.8;
+const vec3 kMultipleScatteringCoefficient =
+    vec3(4.09e-3, 2.76e-3, 2.0e-3) * kPlanetRadiusInKm;
+const vec3 kSkyIrradianceCoefficient =
+    vec3(0.298730, 0.163208, 0.127075) * 2.0;
+const vec3 kInverseWhitePoint = vec3(1.0, 0.79, 0.2);
+const float kMaxInscatterDistance = 800.0 / kPlanetRadiusInKm;
+
+#endif  // #ifdef VENUS_ATMOSPHERE
+
+// See above for the definition of these constants.
+// The values come from various sources:
+// - kRayleighScale and kRayleighScatteringCoefficient are deduced from
+// http://nssdc.gsfc.nasa.gov/planetary/factsheet/plutofact.html
+// using the 'scale height' and 'surface density' and using a proportionality
+// rule between the surface density and scattering coefficients to get the
+// scattering coefficients for Pluto from those for the Earth.
+// From https://en.wikipedia.org/wiki/Atmosphere_of_Pluto we see that
+// atmospheric haze on Pluto is multi-layered and should extend ~200km from
+// the surface. Normal optical depth is estimated as 0.004-0.013.  Scale height
+// of the haze is 45-55 km.
+
+#ifdef PLUTO_ATMOSPHERE
+
+const float kPlanetRadiusInKm = 1187.0;
+const float kInnerAtmosphereRadius = 1186.0 / kPlanetRadiusInKm;
+const float kOuterAtmosphereRadius = 1247.0 / kPlanetRadiusInKm;
+const float kAtmosphereRadius = kOuterAtmosphereRadius;
+const float kAtmosphereHeight = kOuterAtmosphereRadius - kPlanetRadius;
+const float kMaxHorizonDistSq =
+    kOuterAtmosphereRadius * kOuterAtmosphereRadius -
+    kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+const float kMaxHorizonDist = 0.324; // = sqrt(kMaxHorizonDistSq);
+const float kRayleighScale = 45.0 / kPlanetRadiusInKm;
+const vec3 kRayleighScatteringCoefficient =
+    vec3(9.53e-6, 2.218e-5, 5.44e-5) * kPlanetRadiusInKm;
+const float kMieScale = 1.0 / kPlanetRadiusInKm;
+const vec3 kMieScatteringCoefficient =
+    vec3(2.00e-2, 1.59e-2, 1.18e-2) * 0.33 * kPlanetRadiusInKm;
+const vec3 kMieExtinctionCoefficient = kMieScatteringCoefficient / 0.2;
+const float kMieG = 0.5;
+const vec3 kMultipleScatteringCoefficient =
+    vec3(1.326e-6, 7.39e-6, 3.74e-5) * kPlanetRadiusInKm;
+const vec3 kSkyIrradianceCoefficient = vec3(0.198730, 0.163208, 0.127075);
+const vec3 kInverseWhitePoint = vec3(1.0);
+const float kMaxInscatterDistance = 800.0 / kPlanetRadiusInKm;
+
+#endif  // #ifdef PLUTO_ATMOSPHERE
+
+// The minimum camera radius in planet unit to compute atmosphere effects (must
+// be strictly larger than kInnerAtmosphereRadius to avoid NaNs in several
+// functions).
+const float kMinCameraRadius = kInnerAtmosphereRadius + 1e-7;
+
+// An empirical "average" total extinction coefficient, taking both Rayleigh
+// and Mie scattering into account, used to approximate the transmittance in the
+// green and blue channels from the transmittance in the red channel.
+const vec3 kAverageExtinctionCoefficient =
+    (kRayleighScatteringCoefficient * kRayleighScale +
+     kMieExtinctionCoefficient * kMieScale) / (kRayleighScale + kMieScale);
+
+// The size of the atmospheric inscattering and transmittance textures, computed
+// at each frame to reflect the atmospheric inscattering and transmittance from
+// the current camera and Sun positions. These textures are then used to render
+// the sky, the oceans and the ground on screen much faster than with a
+// numerical integration at each pixel.
+const float kInscatterWidth = 64.0;
+const float kInscatterHeight = 64.0;
+
+// The number of samples used in the numerical integration of the atmospheric
+// inscattering and transmittance. This numerical integration is only used to
+// compute two small textures at each frame (see above), and can thus be quite
+// high - to improve quality - without significantly impacting performance.
+const int kIntegrationSamples = 9;
+
+// -----------------------------------------------------------------------------
+// UNIFORMS
+// -----------------------------------------------------------------------------
+
+// The transmittance of the atmosphere (in the rgb channels, unitless), and the
+// intensity of the multiple scattering, relatively to the Sun radiance (in the
+// a channel, unitless), depending on altitude and Sun zenith angle. The values
+// for radius r and Sun zenith angle cosinus muS are stored at coordinates
+//   u = (r - kPlanetRadius) / (kAtmosphereRadius - kPlanetRadius)
+//   v = (muS + sqrt(2 * kAtmosphereHeight) * (1 + u) / 2 + 0.2) / 1.2
+// Notes:
+// - The 0.2 offset ensures a covering of all Sun zenith angles from 0 to 101
+// degrees (i.e. from the zenith to 11 degrees below the horizon - indeed the
+// transmittance and multiple scattering components do not vanish at 90 degrees,
+// but a little bit after, especially at high altitudes).
+// - The sqrt(2 * kAtmosphereHeight) * (1 + u) / 2 offset is an
+// approximation of the cosinus of the horizon zenith angle at radius r (the
+// true value is sqrt(1 - (kPlanetRadius / r)^2)). Its purpose is to align the
+// sharp transition in the transmittance values that occurs at the horizon with
+// an iso-v line, in order to avoid bilinear texture interpolation artifacts).
+// The approximation is good enough for this purpose, and avoids costly division
+// and square root operations.
+// - The multiple scattering component a is an average of the light that reaches
+// radius r after two or more scattering events, averaged over all possible
+// incoming directions. It is computed by accumulating the "DeltaJ" textures
+// computed by Algorithm 4.1 in "Precomputed Atmospheric Scattering", Bruneton
+// et al. EGSR 2008, and averaging over all incident directions. More precisely,
+// the multiply scattered light at radius r, relatively to the outer Sun
+// radiance, is given by texel.a * texel.a * kMultipleScatteringCoefficient.
+// (it turns out that the multiple scattering R,G,B channels are almost
+// proportional, thus it is sufficient to store only one and to compute the
+// others with a simple proportionality factor).
+uniform sampler2D atmoSampler;
+
+// The irradiance due to the sky dome (excluding the Sun) on a horizontal
+// surface, relatively to the Sun radiance, depending on altitude and Sun zenith
+// angle (unitless). The irradiance for radius r and Sun zenith angle cosinus
+// muS is stored at coordinates
+//   u = (muS + 0.2) / 1.2
+//   v = (r - kPlanetRadius) / (kAtmosphereRadius - kPlanetRadius)
+// Notes:
+// - The 0.2 offset ensures a covering of all Sun zenith angles from 0 to 101
+// degrees (i.e. from the zenith to 11 degrees below the horizon - indeed the
+// sky does not become black When the Sun disappear below the horizon, but a
+// little bit after, especially at high altitudes).
+// - The sky irradiance is computed like the "E" textures in Algorithm 4.1 in
+// "Precomputed Atmospheric Scattering", Bruneton et al. EGSR 2008. The sky
+// irradiance, relatively to the outer Sun radiance, is given by texel.rgb *
+// texel.rgb * kSkyIrradianceCoefficient.
+uniform sampler2D skySampler;
+
+// The atmospheric inscattering (in the rgb components) and the atmospheric
+// transmittance (for the red wavelength, in the alpha component) for the
+// current camera and Sun positions, from the camera to the ground or the top
+// atmosphere boundary.
+// Each (u,v) texel corresponds to a specific view ray direction, via a non
+// linear mapping ensuring that directions where the atmospheric inscattering
+// changes rapidly (e.g. near the horizon discontinuity, and near the terminator
+// line) are more densely sampled (in order to avoid visible artefacts due to
+// undersampling in these areas). This mapping is defined by the functions
+// u=inverseGetMuSNu() and v=inverseGetMu() below.
+// A non linear tone mapping is also used to store the inscattering with a
+// good precision with only 3x8 bits. The true inscattering must therefore be
+// retrieved with inverse tone mapping function, unless FLOAT_TEXTURES is
+// defined (meaning that floating point textures are supported). In this case
+// the inscattering is stored as is, and the transmittance is stored via its log
+// to optimize computations in the inscatter() functions).
+uniform sampler2D inscatterSampler;
+
+// A texture representing the Sun disc.
+uniform sampler2D sunSampler;
+
+// Format:
+//  - x: r0 = distance from the camera to the planet center in PU.
+//  - y: muS0 = sun zenith angle cosinus at camera.
+//  - z: When the inscatter textures are being generated, this value is 0 to
+//    compute the first inscatter texture, 1 to compute the second one. During
+//    rendering it contains the meters in view in the y-direction.
+//  - w: When the inscatter textures are being generated, this value is 0, or 1
+//    if the rendering will be done in the APPROXIMATE_AERIAL_PERSPECTIVE mode.
+//    During rendering it contains the atmosphere fading coefficient (a non
+//    physical tweak varying between 0 (atmosphere not shown) and 1 (atmosphere
+//    fully visible) - see the atmosphereFading function below.
+uniform vec4 cameraAndSunState;
+
+// -----------------------------------------------------------------------------
+// DIRECT RENDERING FUNCTIONS
+// -----------------------------------------------------------------------------
+
+// The Rayleigh phase function, as a function of the cosinus nu of the phase
+// angle (angle between view and Sun direction).
+float rayleighPhaseFunction(float nu) {
+  return (3.0 / (16.0 * kPi)) * (1.0 + nu * nu);
+}
+
+// The Mie phase function, as a function of the cosinus nu of the phase
+// angle (angle between view and Sun direction).
+float miePhaseFunction(float nu) {
+  float v = (1.0 + kMieG * kMieG) - (2.0 * kMieG) * nu;
+  return ((1.0 - kMieG * kMieG) / (4.0 * kPi)) / (v * sqrt(v));
+}
+
+// Returns the u,v texture coordinates corresponding to a given radius r in PU
+// and Sun zenith angle cosinus muS for the 'atmoSampler' texture.
+// Assumes kInnerAtmosphereRadius <= r <= kOuterAtmosphereRadius (for
+// r < kPlanetRadius negative u coordinates are returned, which will be clamped
+// to 0 in the texture lookup due to the CLAMP_TO_EDGE wrap mode).
+vec2 atmoUV(float r, float muS) {
+  const vec2 kTextureSize = vec2(8.0, 128.0);
+  const vec2 kTextureOffset = vec2(0.5) / kTextureSize;
+  const vec2 kTextureScale = (kTextureSize - vec2(1.0)) / kTextureSize;
+  // The code below is an optimized version of the following code:
+  // float u = (r - kPlanetRadius) * (1.0 / kAtmosphereHeight);
+  // float muHorizon = sqrt(2.0 * kAtmosphereHeight) * (1.0 + u) * 0.5;
+  // float v = (muS + muHorizon + 0.2) * (1.0 / 1.2);
+  // return kTextureOffset + vec2(u, v) * kTextureScale;
+  const float kH = 0.06868;  // = sqrt(0.5 * kAtmosphereHeight);
+  const vec2 kUvScale = vec2(1.0 / kAtmosphereHeight, 1.0 / 1.2);
+  const float kRScale = kH * kUvScale.x;
+  const vec2 kScale = kUvScale * kTextureScale;
+  const vec2 kUvOffset = vec2(-kPlanetRadius, 0.2) * kUvScale;
+  const vec2 kROffset = vec2(0.0, kH * (1.0 + kUvOffset.x)) * kScale;
+  const vec2 kOffset = kTextureOffset + kUvOffset * kTextureScale + kROffset;
+  return vec2(r, r * kRScale + muS) * kScale + kOffset;
+}
+
+// Returns the transmittance of the atmosphere and the intensity of the multiple
+// scattering, relatively to the Sun radiance, for the given radius r in PU and
+// Sun zenith angle cosinus muS. See 'atmoSampler'.
+// Assumes kInnerAtmosphereRadius <= r <= kOuterAtmosphereRadius (for
+// r < kPlanetRadius, the result will be as if r was clamped to kPlanetRadius).
+vec4 atmoTex(float r, float muS) {
+  return texture2D(atmoSampler, atmoUV(r, muS));
+}
+
+// Returns the u,v texture coordinates corresponding to a given radius r in PU
+// and Sun zenith angle cosinus muS for the 'skySampler' texture.
+// Assumes kInnerAtmosphereRadius <= r <= kOuterAtmosphereRadius (for
+// r < kPlanetRadius negative u coordinates are returned, which will be clamped
+// to 0 in the texture lookup due to the CLAMP_TO_EDGE wrap mode).
+vec2 skyUV(float r, float muS) {
+  const vec2 kTextureSize = vec2(64.0, 16.0);
+  const vec2 kTextureOffset = vec2(0.5) / kTextureSize;
+  const vec2 kTextureScale = (kTextureSize - vec2(1.0)) / kTextureSize;
+  // The code below is an optimized version of the following code:
+  // float u = (muS + 0.2) * (1.0 / 1.2);
+  // float v = (r - kPlanetRadius) * (1.0 / kAtmosphereHeight);
+  // return kTextureOffset + vec2(u, v) * kTextureScale;
+  const vec2 kUvScale = vec2(1.0 / 1.2, 1.0 / kAtmosphereHeight);
+  const vec2 kScale = kUvScale * kTextureScale;
+  const vec2 kUvOffset = vec2(0.2, -kPlanetRadius) * kUvScale;
+  const vec2 kOffset = kTextureOffset + kUvOffset * kTextureScale;
+  return vec2(muS, r) * kScale + kOffset;
+}
+
+// Returns the irradiance due to the sky dome (excluding the Sun) on a
+// horizontal surface, relatively to the Sun radiance, corresponding to a given
+// radius r in PU and Sun zenith angle cosinus muS. See 'skySampler'.
+// Assumes kInnerAtmosphereRadius <= r <= kOuterAtmosphereRadius (for
+// r < kPlanetRadius, the result will be as if r was clamped to kPlanetRadius).
+vec3 skyTex(float r, float muS) {
+  vec3 texel = texture2D(skySampler, skyUV(r, muS)).rgb;
+  return texel * texel * kSkyIrradianceCoefficient;
+}
+
+// Returns the radiance of the Sun from space (no atmospheric attenuation), in
+// the viewDirSun direction (or 0 if such a ray does not hit the Sun), where
+// viewDirSun is the view vector in Sun space (a coordinate system whose z axis
+// is pointing towards the Sun), pointing *away* from the camera.
+vec3 outerSunRadiance(vec3 viewDirSun) {
+  vec3 sunRadiance = vec3(0.0);
+  if (viewDirSun.z > 0.0) {
+    vec3 texel = texture2D(sunSampler, vec2(0.5) + viewDirSun.xy * 4.0).rgb;
+    vec3 texel2 = texel * texel;
+    sunRadiance = texel2 * texel2;
+  }
+  return sunRadiance;
+}
+
+// Returns the radiance of the light (relatively to the Sun outer radiance, so
+// unitless) scattered towards an observer at radius r in PU, for a view
+// direction zenith angle cosinus mu, Sun zenith angle cosinus muS, phase angle
+// cosinus nu, and maximal distance dMax. This function also computes in
+// 'transmittance' the transparency of the atmosphere along this ray (unitless).
+// Assumes kInnerAtmosphereRadius <= r <= kOuterAtmosphereRadius, and also
+// assumes that the point at distance dMax is also in the atmosphere.
+//
+// Notes:
+// - This function uses a numerical integration along the view ray to compute
+// the inscattered and outscattered radiance, as in O'Neil 2005. As in O'Neil,
+// it uses a precomputed transmittance (aka "out-scattering") function, but with
+// several differences:
+//   * the transmittance function is stored in a texture, instead of being
+//   approximated with an analytic formula.
+//   * the transmittance function is precomputed for each channel separately,
+//   instead of using a single scalar value, which gives more realistic results.
+//   * the precomputed transmittance is only used for the Sun rays. The
+//   transmittance along the view ray is computed during the numerical
+//   integration.
+// - This function uses a Trapezoidal integration scheme, as in "Texturing and
+// Modeling: a Procedural Approach", Musgrave et al. This is more precise than
+// the simple integration scheme used by O'Neil.
+// - This function also takes multiple scattering into account, in addition to
+// single scattering. This is needed to get correct colors at sunset/sunrise.
+// For this, it approximates the multiple scattering contribution as an ambient
+// term, depending only on altitude and Sun zenith angle, stored in the fourth
+// channel of the transmittance texture (see 'atmoSampler').
+//
+// Variables:
+// - d{I,J} is the distance from a sample point to the camera.
+// - r{I,J} is the distance from a sample point to the planet's center.
+// - atmo{I,J} is the amount of Sun light reaching a sample point directly resp.
+//   via multiple scattering (in the rgb resp. a channels), relatively to the
+//   Sun outer radiance. See 'atmoSampler'.
+// - density{I,J} is the density of Rayleigh & Mie particles at a sample point.
+// - transmittance is the transparency of the atmosphere between the camera and
+//   the current sample point.
+// - ray{I,J} is the Rayleigh scattering coefficient at a sample point, taking
+//   its altitude and the Rayleigh phase function into account.
+// - mie{I,J} is the Mie scattering coefficient at a sample point, taking its
+//   altitude and the Mie phase function into account.
+// - amb{I,J} is the Sun light scattered towards the observer by Rayleigh and/or
+//   Mie particules after two or more scattering events. See 'atmoSampler'.
+// - inscatter{I,J} is the total Sun light scattered towards the observer at a
+//   sample point, and attenuated along its way towards the observer.
+// - inscatter is total Sun light scattered towards the observer between the
+//   camera and the current sample point.
+// I refers to the previous sample point, J to the current one.
+vec3 inscatterRadiance(float r,
+                       float mu,
+                       float muS,
+                       float nu,
+                       float dMax,
+                       out vec3 transmittance) {
+  // After some distance, which depends on the atmosphere parameters, the
+  // attenuation between the camera and a sample point is so high that these
+  // sample points do not contribute to the integral. Thus we can safely limit
+  // the integration interval to this maximal distance, which puts more samples
+  // in the contributing interval.
+  dMax = min(dMax, kMaxInscatterDistance);
+
+  // Computes the half distance between two successive integration samples.
+  // Also computes 1 / 2r to avoid a division in the body of the loop below.
+  float halfStep = dMax * (0.5 / float(kIntegrationSamples - 1));
+  float oneOverTwoR = 0.5 / r;
+
+  // Computes the Rayleigh and Mie scattering coefficients times the phase
+  // function values (constant along the ray) for the phase angle nu.
+  vec3 rayleigh = kRayleighScatteringCoefficient * rayleighPhaseFunction(nu);
+  vec3 mie = kMieScatteringCoefficient * miePhaseFunction(nu);
+
+  // Computes a first sample for the numerical integration, at the camera.
+  vec4 atmoI = atmoTex(r, muS);
+  vec2 densityI = exp(vec2(min(kPlanetRadius - r, 0.0)) *
+                      vec2(1.0 / kRayleighScale, 1.0 / kMieScale));
+  vec3 rayI = rayleigh * densityI.x;
+  vec3 mieI = mie * densityI.y;
+  vec3 ambI = kMultipleScatteringCoefficient * atmoI.a * atmoI.a;
+  vec3 inscatterI = (rayI + mieI) * atmoI.rgb + ambI;
+  transmittance = vec3(1.0);
+  vec3 inscatter = vec3(0.0);
+
+  // Iterates over each integration interval.
+  for (int j = 2; j < 2 * kIntegrationSamples; j += 2) {
+    // Computes the distance to the camera dJ, radius rJ and Sun zenith angle
+    // cosinus muSJ at the new current sample point. rJ is theoretically equal
+    // to sqrt(r * r + (dJ + 2.0 * r * mu) * dJ). A Taylor series provides a
+    // good approximation and avoids a costly square root operation. Likewise,
+    // muSJ is theoretically equal to (nu * dJ + muS * r) / rJ. Replacing rJ
+    // with kPlanetRadius is a good approximation that avoids a costly division.
+    float dJ = float(j) * halfStep;
+    float rJ = r + dJ * (mu + dJ * oneOverTwoR);
+    float muSJ = (nu * dJ + muS * r) * (1.0 / kPlanetRadius);
+    vec4 atmoJ = atmoTex(rJ, muSJ);
+    vec2 densityJ = exp(vec2(min(kPlanetRadius - rJ, 0.0)) *
+                        vec2(1.0 / kRayleighScale, 1.0 / kMieScale));
+    vec3 rayJ = rayleigh * densityJ.x;
+    vec3 mieJ = mie * densityJ.y;
+    vec3 ambJ = kMultipleScatteringCoefficient * atmoJ.a * atmoJ.a;
+    transmittance *= exp(((-2.0 * kRayleighScatteringCoefficient) * densityJ.x +
+        (-2.0 * kMieExtinctionCoefficient) * densityJ.y) * halfStep);
+    vec3 inscatterJ = ((rayJ + mieJ) * atmoJ.rgb + ambJ) * transmittance;
+    inscatter += (inscatterI + inscatterJ) * halfStep;
+    inscatterI = inscatterJ;
+  }
+
+  return inscatter;
+}
+
+// Returns a low dynamic range pixel color corresponding to the given high
+// dynamic range radiance.
+vec3 toneMapping(vec3 L, float exposure) {
+  L = L * exposure;
+#ifdef SIMPLE_TONE_MAPPING
+  L = vec3(1.0) - exp(-L);
+#else
+  L = vec3(1.0) - exp(-(sqrt(L) + L) * (1.0 / 1.8));  // better looking?
+#endif
+  return L;
+}
+
+// Returns the high dynamic range radiance corresponding to the given low
+// dynamic range pixel color. This is the inverse of the toneMapping function.
+vec3 inverseToneMapping(vec3 L, float exposure) {
+  float oneOverExposure = 1.0 / exposure;
+#ifdef SIMPLE_TONE_MAPPING
+  return log(vec3(1.0) - L) * (-oneOverExposure);
+#else
+  L = -1.0 * log(vec3(1.0) - L) * 1.8;
+  L = (vec3(1.0) - sqrt(vec3(1.0) + 4.0 * L)) * 0.5;
+  return L * L * oneOverExposure;
+#endif
+}
+
+// -----------------------------------------------------------------------------
+// INDIRECT RENDERING FUNCTIONS
+// -----------------------------------------------------------------------------
+
+// FIRST PART: FUNCTIONS TO COMPUTE THE INSCATTER TEXTURES.
+
+// A sigmoid function from [-1:1] to [-1:1].
+float sigmoid(float x) {
+  return 2.0 * x / (1.0 + x * x);
+}
+
+// Returns x if it is larger than x0 or a value between x0-dx and x0 otherwise,
+// such that the function is continuously differentiable w.r.t. x (unlike max).
+float smoothmax(float x0, float dx, float x) {
+  return x < x0 ? x0 + (1.0 / ((x0 - x) * (1.0 / dx) + 1.0) - 1.0) * dx : x;
+}
+
+// Returns the view zenith angle cosinus mu corresponding to the given inscatter
+// texture coordinate v, when the camera is at distance r from the planet
+// center. The mapping between v and mu is non linear in order to get more
+// precision near the horizon. The mapping used is the one defined in Figure 4
+// in "Precomputed Atmospheric Scattering", Bruneton et al. EGSR 2008.
+// v is in pixels, r in PU (must be smaller than kOuterAtmosphereRadius).
+// Assumes kInnerAtmosphereRadius <= r <= kOuterAtmosphereRadius.
+float getMu(float r, float v) {
+  const float kHalfHeight = 0.5 * kInscatterHeight;
+  const float kInvHalfHeight = 1.0 / (kHalfHeight - 1.0);
+
+  float horizonDistSq = r * r - kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+  float horizonDist = sqrt(horizonDistSq);
+  float dMin, dMax, d, mu;
+
+  if (v < kHalfHeight) {
+    dMin = r - kInnerAtmosphereRadius;
+    dMax = horizonDist;
+    d = 1.0 - v * kInvHalfHeight;
+    d = clamp(d * dMax, dMin, dMax * 0.999);
+    mu = -(horizonDistSq + d * d) / (2.0 * r * d);
+    mu = min(mu, -horizonDist / r - 0.001);
+  } else {
+    dMin = kOuterAtmosphereRadius - r;
+    dMax = horizonDist + kMaxHorizonDist;
+    d = (v - kHalfHeight) * kInvHalfHeight;
+    d = clamp(d * dMax, dMin, dMax * 0.999);
+    mu = (kMaxHorizonDistSq - horizonDistSq - d * d) / (2.0 * r * d);
+  }
+
+  return mu;
+}
+
+// Returns the mininum and maximum possible values of the Sun zenith angle
+// cosinus muS at the view ray entry point in the atmosphere, for a view
+// direction whose zenith angle cosinus is mu, when the camera is at distance
+// r0' from the planet center (relatively to the *atmosphere* radius), and when
+// the Sun zenith angle cosinus at the camera is muS0. Also returns the distance
+// t to the top atmophere boundary (relatively to the *atmosphere* radius).
+// Assumes r0' >= 1.0.
+vec2 getMuSBound(float r0prime, float mu, float r0primeMuS0, out float t) {
+  // Computes the distance from the camera to the top atmosphere boundary,
+  // relatively to the atmosphere radius (unitless).
+  t = mu + sqrt(mu * mu + r0prime * r0prime - 1.0);
+  // For any view direction, muS at the entry point into the atmosphere is
+  // equal to r0' * muS0 + t * nu, where nu is the cosine of the view Sun angle.
+  // But nu is always between -1 and 1, and so muS is always between
+  // r0' * muS0 +/- t. Moreover muS is also between -1 and 1, so we can restrict
+  // the bounds to max(-1, r0' * muS0 - t) and min(1, r0' * muS0 + t). Finally,
+  // since the atmosphere is black when muS is less than -0.15, we can further
+  // restrict the bounds to max(-0.15, r0' * muS0 - t), min(1, r0' * muS0 + t).
+  // In practice we use smoothmax instead of max to avoid artifacts due to the
+  // non derivability of the max(x0, x) function at x0.
+  float muSmin = smoothmax(-0.15, 0.1, r0primeMuS0 - t);
+  float muSmax = max(muSmin + 1e-6, min(1.0, r0primeMuS0 + t));
+  return vec2(muSmin, muSmax);
+}
+
+// Returns the Sun zenith angle cosinus muS at the view ray entry point in the
+// atmosphere and the view Sun angle cosinus nu corresponding to the given
+// inscatter texture coordinate v, when the camera is at distance r0 in PU from
+// the planet center, the view zenith angle cosinus is mu and the Sun zenith
+// angle cosinus at the camera is muS0.
+vec2 getMuSNu(float r0, float mu, float muS0, float u) {
+  float r0prime = r0 * (1.0 / kOuterAtmosphereRadius);
+  u = sigmoid(u * (2.0 / (kInscatterWidth - 1.0)) - 1.0);
+  if (r0prime < 1.0) {
+    return vec2(muS0, u);
+  } else {
+    float t;
+    vec2 muSBound = getMuSBound(r0prime, mu, r0prime * muS0, t);
+    float muS = (u * 0.5 + 0.5) * (muSBound.y - muSBound.x) + muSBound.x;
+    float nu = clamp((muS - r0prime * muS0) / t, -1.0, 1.0);
+    return vec2(muS, nu);
+  }
+}
+
+// Returns the distance from the camera to the ground or to the top atmosphere
+// boundary, when the camera is at distance r in PU from the planet center and
+// when the view zenith angle cosinus is mu.
+// Assumes kInnerAtmosphereRadius <= r <= kOuterAtmosphereRadius.
+float getMaxDistance(float r, float mu) {
+  float rSq = r * r;
+  float rMu = -r * mu;
+  float delta0 = rMu * rMu - rSq;
+  float delta = delta0 + kOuterAtmosphereRadius * kOuterAtmosphereRadius;
+  float deltaSqrt = sqrt(delta);
+  float d = rMu + deltaSqrt;
+
+  // To compute the distance from the camera to the ground we model the ground
+  // with a perfect sphere of a certain radius r. For Mars we always use the
+  // radius r corresponding to the lowest under water point. For the Earth, we
+  // use the sea level radius when in APPROXIMATE_AERIAL_PERSPECTIVE mode
+  // (camera looking almost straight down), or the radius of the lowest under
+  // water point otherwise. See the comments of the getMaxDistances function
+  // below for more details.
+#if defined(MARS_ATMOSPHERE) || defined(VENUS_ATMOSPHERE) || defined(PLUTO_ATMOSPHERE)
+  delta = delta0 + kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+#else
+  delta = delta0 + (cameraAndSunState[3] > 0.0 ?
+      kPlanetRadius * kPlanetRadius :
+      kInnerAtmosphereRadius * kInnerAtmosphereRadius);
+#endif
+  float distanceToGround = delta > 0.0 ? rMu - sqrt(delta) : -1.0;
+  return distanceToGround > 0.0 ? distanceToGround : d;
+}
+
+// Returns the two distances from the camera used to compute the two
+// intermediate textures allowing to reconstruct the atmospheric transmittance
+// and inscattering for arbitrary distances (using a piecewise linear
+// approximation, see the comment at the begining of this file). These distances
+// depend on the distance r from the camera to the planet center in PU and on
+// the view zenith angle cosinus mu. They are defined as follows (the r0 and
+// r1 lines are normally circle arcs but are shown as straight segments here for
+// for simplicity):
+//
+// -------------------------------------------                  r1
+// o                 |                        |
+//  | view ray        | dist1                  | dist2
+//   |               /                         |
+// ------------------------------------------------------------ r0
+//
+// - dist1 is the distance from the camera (point o), along the view ray of view
+// zenith angle cosinus mu, to the ellipsoid of revolution whose axis is the
+// vertical at o, of vertical diameter 2.rz = r1-r0 and of horizontal radius rx
+// (chosen empirically as 0.05 * r0).
+// - dist2 is the distance from the camera (point o), along the view ray of view
+// zenith angle cosinus mu, to the sphere of radius r0 or, if the view ray does
+// not intersect this sphere, to the horizon line.
+//
+// The radii r0 and r1 are chosen as follows:
+// - for the Earth we use the sea level radius and the outer atmosphere radius,
+// except when the camera is under water (where we use the radius corresponding
+// to the lowest under water point for r0 - we don't use this value for above
+// water shading in order to get better precision). This yields a discontinuity
+// when going under water, but this is not an issue since there really is a
+// discontinuity here.
+// - for Mars we always use the inner and outer atmosphere radii for r0 and r1.
+// This ensures that we don't get any discontinuity at kPlanetRadius (which does
+// not correspond to any physical boundary).
+//
+// Assumes kInnerAtmosphereRadius <= r <= kOuterAtmosphereRadius.
+// Returns the two distances in a vec2, with the x component always positive and
+// less than or equal to the y component.
+vec2 getMaxDistances(float r, float mu, float rMu) {
+  const float r0SqA = kPlanetRadius * kPlanetRadius;
+  const float rcA = (kOuterAtmosphereRadius + kPlanetRadius) * 0.5;
+  const float rzA = (kOuterAtmosphereRadius - kPlanetRadius) * 0.5;
+  const float rzxA = rzA / (0.05 * kPlanetRadius);
+  const vec4 kEllipseA = vec4(rcA, rzxA * rzxA, 1.0 - rzxA * rzxA, rzA * rzA);
+  const float r0SqB = kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+  const float rcB = (kOuterAtmosphereRadius + kInnerAtmosphereRadius) * 0.5;
+  const float rzB = (kOuterAtmosphereRadius - kInnerAtmosphereRadius) * 0.5;
+  const float rzxB = rzB / (0.05 * kInnerAtmosphereRadius);
+  const vec4 kEllipseB = vec4(rcB, rzxB * rzxB, 1.0 - rzxB * rzxB, rzB * rzB);
+#if defined(MARS_ATMOSPHERE) || defined(VENUS_ATMOSPHERE) || defined(PLUTO_ATMOSPHERE)
+  const float r0Sq = r0SqB;
+  const vec4 ellipse = kEllipseB;
+#else
+  float r0Sq = cameraAndSunState.x >= kPlanetRadius ? r0SqA : r0SqB;
+  vec4 ellipse = cameraAndSunState.x >= kPlanetRadius ? kEllipseA : kEllipseB;
+#endif
+  float dr = r - ellipse.x;
+  float A = ellipse.y + mu * mu * ellipse.z;
+  float B = dr * mu;
+  float C = dr * dr - ellipse.w;
+  float dist1 = max((-B + sqrt(B * B - A * C)) / A, 1e-6);
+  rMu = min(rMu, -sqrt(r * r - r0Sq) - 0.002);
+  float delta = rMu * rMu - r * r + r0Sq;
+  float dist2 = -rMu - sqrt(delta);
+  return dist1 < dist2 ? vec2(dist1, dist2) : vec2(dist2, dist1);
+}
+
+// Returns the atmospheric inscattering (in the rgb components) and the
+// atmospheric transmittance (for the red wavelength, in the alpha component),
+// for the view ray parameters r,mu,muS,nu,d corresponding to the fragment
+// coordinates 'fragCoord' in pixels via the non linear mappings getMu and
+// getMuSNu.
+vec4 computeInscatter(vec2 fragCoord, float exposure) {
+  vec2 uv = floor(fragCoord);
+  float r0 = max(kMinCameraRadius, cameraAndSunState.x);
+  float muS0 = cameraAndSunState.y;
+  float r = min(r0, kOuterAtmosphereRadius);
+  float mu = getMu(r, mod(uv.y, kInscatterHeight));
+  vec2 muSNu = getMuSNu(r0, mu, muS0, uv.x);
+  float d;
+  if (cameraAndSunState.z > 0.5) {
+    vec2 dists = getMaxDistances(r, mu, r * mu);
+    d = uv.y < kInscatterHeight ? dists.x : dists.y;
+  } else {
+    d = getMaxDistance(r, mu);
+  }
+  vec3 transmittance;
+  vec3 inscatter = inscatterRadiance(r, mu, muSNu.x, muSNu.y, d, transmittance);
+  // Physical radiances or "true colors" as computed here are not perceived as
+  // is due to the chromatic adaptation of the human visual system (see
+  // http://en.wikipedia.org/wiki/Chromatic_adaptation), which ensures that a
+  // white surface is always perceived white, even if illuminated by a colored
+  // light source (like a red Sun or a blue sky). To get realistic results, it
+  // is necessary to simulate this effect (as done in digital cameras for
+  // instance, where it is called color balance). This can be done by computing
+  // the "true color" of a white surface illuminated by the Sun and the sky, and
+  // then dividing all colors by this "white point". This should normally be
+  // done at the very end of the shader computations, during tone mapping, and
+  // the white point should normally be computed based on the time of day.
+  // Instead, we apply this color balance here, i.e. only on the inscatter
+  // component (i.e. the sky and aerial perspective colors), to better preserve
+  // the colors of the original ground texture (this also gives warmer colors on
+  // the ground). Also we use a constant white point, which was computed for
+  // sunset/sunrise conditions. We found that this gives good results in all
+  // cases, and is much simpler and more efficient than trying to compute the
+  // white point dynamically.
+  inscatter *= kInverseWhitePoint;
+#ifdef FLOAT_TEXTURES
+  transmittance.r = log(transmittance.r);
+#else
+  inscatter = min(toneMapping(inscatter, exposure), 254.0 / 255.0);
+#endif
+  return vec4(inscatter, transmittance.r);
+}
+
+// SECOND PART: FUNCTIONS TO READ THE INSCATTER TEXTURES.
+
+// Computes the inverse of the "sigmoid" function above.
+float inverseSigmoid(float y) {
+  return y == 0.0 ? 0.0 : (1.0 - sqrt(1.0 - y * y)) / y;
+}
+
+// Returns the inscatter texture coordinate v corresponding to the given view
+// zenith angle cosinus mu (at the view ray entry point in the atmosphere), when
+// the camera is at distance r0 from the planet center. v is in [0,1], r0 in PU.
+// The mapping between v and mu is non linear in order to get more precision
+// near the horizon. The mapping used is the one defined in "Precomputed
+// Atmospheric Scattering", Bruneton et al. EGSR 2008 (see Figure 4).
+// This is the inverse of the "getMu" function above.
+float inverseGetMu(float r0, float mu) {
+  const float kHalfInvHeight = 0.5 / kInscatterHeight;
+  const float H = kMaxHorizonDist;
+
+  float r = min(r0, kOuterAtmosphereRadius);
+  float horizonDistSq = r * r - kInnerAtmosphereRadius * kInnerAtmosphereRadius;
+  float horizonDist = sqrt(horizonDistSq);
+  float rMu = r * mu;
+  float delta = rMu * rMu - horizonDistSq;
+  vec2 c = rMu < -horizonDist ? vec2(-1.0, 0.0) : vec2(1.0);
+  float v = (sqrt(delta + (H * H) * c.y) - rMu * c.x) / (horizonDist + H * c.y);
+  return 0.5 + kHalfInvHeight * c.x + v * (0.5 - 2.0 * kHalfInvHeight);
+}
+
+// Returns the inscatter texture coordinate u corresponding to the given view
+// zenith angle cosinus mu, when the camera is at distance r0 in PU from the
+// planet center, the Sun zenith angle cosinus at the camera is muS0, the Sun
+// zenith angle cosinus is muS and the view Sun angle cosinus is nu (assuming
+// that mu and muS are measured at the view ray entry point in the atmosphere).
+// This is the inverse of the "getMuSNu" function above.
+float inverseGetMuSNu(float r0, float mu, float muS0, float muS, float nu) {
+  const float kA = 0.5 * (1.0 - 1.0 / kInscatterWidth);
+  const float kB = 0.5 / kInscatterWidth + kA;
+  float v = nu;
+
+  float r0prime = r0 * (1.0 / kOuterAtmosphereRadius);
+  if (r0prime > 1.0) {
+    float ignored;
+    vec2 muSBound = getMuSBound(r0prime, mu, r0prime * muS0, ignored);
+    float x = (muS - muSBound.x) / (muSBound.y - muSBound.x);
+    v = clamp(x * 2.0 - 1.0, -1.0, 1.0);
+  }
+  return inverseSigmoid(v) * kA + kB;
+}
+
+// Returns a fading factor to attenuate the atmospheric effects. To get
+// physically correct results, return 1.0. This function must be defined by the
+// shaders that use this library.
+float atmosphereTweak(float r, float mu);
+
+// Returns the radiance of the light (relatively to the Sun outer radiance, so
+// unitless) which is scattered towards the current viewer position, from the
+// camera to the ground (supposed perfectly spherical) or to the top atmosphere
+// boundary, for a view zenith angle cosinus mu, Sun zenith angle cosinus muS,
+// and phase angle cosinus nu, by using the inscatterSampler texture (assuming
+// that mu and muS are measured at the view ray entry point in the atmosphere).
+// This function also computes in 'transmittance' the transparency of the
+// atmosphere along this ray (unitless), using the same texture.
+vec3 inscatter(
+    float r,
+    float mu,
+    float muS,
+    float nu,
+    float exposure,
+    out vec3 transmittance) {
+  float r0 = max(kMinCameraRadius, cameraAndSunState.x);
+  float muS0 = cameraAndSunState.y;
+  float u = inverseGetMuSNu(r0, mu, muS0, muS, nu);
+  float v = inverseGetMu(r0, mu);
+  vec4 texel = texture2D(inscatterSampler, vec2(u, v));
+#ifdef FLOAT_TEXTURES
+  vec4 inscatterAndOpticalDepth = texel;
+#else
+  vec4 inscatterAndOpticalDepth =
+      vec4(inverseToneMapping(texel.rgb, exposure), log(texel.a));
+#endif
+  inscatterAndOpticalDepth *= atmosphereTweak(r, mu);
+  // The two following lines *approximate* the atmospheric transmittance for the
+  // blue and green wavelengths from the transmittance for the red wavelength.
+  // Storing the true inscatter and transmittance values would require 6 values
+  // per texel, i.e. would require two textures and two texture reads. This
+  // approximation is quite accurate and increases performance.
+  transmittance = vec3(exp((kAverageExtinctionCoefficient /
+      kAverageExtinctionCoefficient.r) * inscatterAndOpticalDepth.a));
+  return inscatterAndOpticalDepth.rgb;
+}
+
+// Returns the radiance of the light (relatively to the Sun outer radiance, so
+// unitless) which is scattered towards the current viewer position, along a
+// distance d, for a view direction zenith angle cosinus mu, Sun zenith angle
+// cosinus muS, phase angle cosinus nu, by using the inscatterSampler texture
+// (assuming that mu and muS are measured at the view ray entry point in the
+// atmosphere). This function also computes in 'transmittance' the transparency
+// of the atmosphere along this ray segment (unitless), using the same texture.
+vec3 inscatter(
+    float r,
+    float mu,
+    float rMu,
+    float muS,
+    float nu,
+    float d,
+    float exposure,
+    out vec3 transmittance) {
+  float r0 = max(kMinCameraRadius, cameraAndSunState.x);
+  float muS0 = cameraAndSunState.y;
+  float u = inverseGetMuSNu(r0, mu, muS0, muS, nu);
+  float v = inverseGetMu(r0, mu) * 0.5;
+  vec4 texel1 = texture2D(inscatterSampler, vec2(u, v));
+  vec4 texel2 = texture2D(inscatterSampler, vec2(u, v + 0.5));
+  vec2 dists = getMaxDistances(r, mu, rMu);
+  vec2 ab = vec2(d / dists.x,
+                 (min(dists.y, d) - dists.x) / max(dists.y - dists.x, 1e-6));
+  ab = ab.x < 1.0 ? vec2(ab.x, 0.0) : vec2(1.0 - ab.y, ab.y);
+  ab *= atmosphereTweak(r, mu);
+#ifdef FLOAT_TEXTURES
+  float opticalDepth = dot(vec2(texel1.a, texel2.a), ab);
+#else
+  float opticalDepth = dot(log(vec2(texel1.a, texel2.a)), ab);
+#endif
+  // Approximates the atmospheric transmittance for the blue and green
+  // wavelengths from the optical depth for the red wavelength.
+  transmittance = vec3(exp((kAverageExtinctionCoefficient /
+      kAverageExtinctionCoefficient.r) * opticalDepth));
+#ifdef FLOAT_TEXTURES
+  vec3 inscatter1 = texel1.rgb;
+  vec3 inscatter2 = texel2.rgb;
+#else
+  vec3 inscatter1 = inverseToneMapping(texel1.rgb, exposure);
+  vec3 inscatter2 = inverseToneMapping(texel2.rgb, exposure);
+#endif
+  return inscatter1 * ab.x + inscatter2 * ab.y;
+}
+
+void aerialPerspective(
+    vec3 cameraAtmo,
+    vec3 posAtmo,
+    vec3 sunDirAtmo,
+    float exposure,
+    out vec3 outTransmittance,
+    out vec3 outInscatter) {
+  // Computes the view ray direction in Atmo space.
+  vec3 viewRay = posAtmo - cameraAtmo;
+  vec3 viewRayDir = normalize(viewRay);
+  // Computes the distance from the camera to the planet center in PU, the view
+  // zenith angle cosinus mu, the Sun zenith angle cosinus muS, and the phase
+  // angle cosinus nu (all measured at the camera position).
+  float r = cameraAndSunState.x;
+  float rMu = dot(cameraAtmo, viewRayDir);
+  float rMuS = dot(cameraAtmo, sunDirAtmo);
+  float nu = dot(viewRayDir, sunDirAtmo);
+  // If the camera is outside the atmosphere, moves it to the entry point of the
+  // view ray inside the atmosphere (which necessarily exists).
+  if (r > kOuterAtmosphereRadius) {
+    // Computes the distance to the view ray entry point in the atmosphere.
+    const float kOuterAtmosphereRadiusSq =
+        kOuterAtmosphereRadius * kOuterAtmosphereRadius;
+    float delta = rMu * rMu - r * r + kOuterAtmosphereRadiusSq;
+    float distanceToAtmosphereEntryPoint = -rMu - sqrt(delta);
+    // Moves the camera to the view ray entry point inside the atmosphere.
+    r = kOuterAtmosphereRadius;
+    rMu += distanceToAtmosphereEntryPoint;
+    rMuS += distanceToAtmosphereEntryPoint * nu;
+  }
+  // Computes the light which is scattered towards the viewer along the view
+  // ray, and the transmittance of the atmosphere along this ray.
+  vec3 transmittance;
+#ifdef APPROXIMATE_AERIAL_PERSPECTIVE
+  // This approximate model is faster but the approximations are acceptable only
+  // when the camera is looking almost straight down.
+  vec3 inscatterL = inscatter(r, rMu / r, rMuS / r, nu, exposure,
+      transmittance);
+#else
+  vec3 inscatterL = inscatter(r, rMu / r, rMu, rMuS / r, nu,
+      length(viewRay.xyz), exposure, transmittance);
+#endif
+  outTransmittance = transmittance;
+  outInscatter = inscatterL;
+}
+
+// Computes the aerial perspective effects on the radiance reflected by a point
+// on the ground (attenuation by the atmosphere, and inscattering along the view
+// ray). groundRadiance is the radiance reflected by the ground at posAtmo,
+// given in Atmo coordinates. cameraAtmo and sunDirAtmo are the camera position
+// and sun direction in Atmo coordinates. The Atmo coordinate system is centered
+// on the planet and its unit of length is the planet radius, such that the
+// planet surface is the unit sphere in this reference frame (the functions
+// defined in this file do not depend on the orientation of this reference
+// frame).
+vec3 aerialPerspective(
+    vec3 groundRadiance,
+    vec3 cameraAtmo,
+    vec3 posAtmo,
+    vec3 sunDirAtmo,
+    float sunIntensity,
+    float exposure) {
+  vec3 transmittance;
+  vec3 inscatterL;
+  aerialPerspective(
+      cameraAtmo, posAtmo, sunDirAtmo, exposure, transmittance, inscatterL);
+  // The pixel radiance is the ground radiance, attenuated by the atmosphere
+  // transmittance and augmented by the atmospheric inscattering.
+  vec3 pixelL = groundRadiance * transmittance + inscatterL * sunIntensity;
+  return toneMapping(pixelL, exposure);
+}
+
+vec3 aerialPerspective(
+    vec3 groundRadiance,
+    vec3 cameraAtmo,
+    vec3 posAtmo,
+    vec3 sunDirAtmo,
+    float exposure) {
+  return aerialPerspective(
+      groundRadiance, cameraAtmo, posAtmo, sunDirAtmo, 1.0, exposure);
+}
+
+vec3 atmosphereFading(vec3 rawColor, vec3 atmoColor) {
+  return mix(rawColor, atmoColor, cameraAndSunState.w);
+}
