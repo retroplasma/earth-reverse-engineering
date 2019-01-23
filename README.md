@@ -67,6 +67,10 @@ NodeData:
  - Texture:
     - Format 1: JPEG
     - Format 6: S3 DXT1 RGB
+BulkMetaData:
+  - Oriented Bounding Box
+    - Dump OBB to obj: https://gist.github.com/retroplasma/5698808bfaa63ffd03f751a84fa6ce14
+    - Latlong to octant using OBB (unstable): https://gist.github.com/retroplasma/a2511c08efb73d89699985fbdc0b5278
 ```
 
 Related ideas: [Racing game](https://www.reddit.com/r/Showerthoughts/comments/aex25s/race_car_video_games_could_be_amazing_if_they/) , [Minimal client](https://github.com/kaylathedev/google-maps-3d-client). WebGL + CORS should work ([test](https://retroplasma.github.io/get_planetoid_metadata.html)).
