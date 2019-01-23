@@ -1,0 +1,518 @@
+syntax = "proto2";
+
+package keyhole.dbroot;
+
+option java_package = "com.google.keyhole.tools.dbroot";
+
+message StringEntryProto {
+    required fixed32 string_id = 1;
+    required string string_value = 2;
+}
+
+message StringIdOrValueProto {
+    optional fixed32 string_id = 1;
+    optional string value = 2;
+}
+
+message PlanetModelProto {
+    optional double radius = 1 [default = 6378.137];
+    optional double flattening = 2 [default = 0.00335281066474748];
+    optional double elevation_bias = 4;
+    optional int32 negative_altitude_exponent_bias = 5;
+    optional double compressed_negative_altitude_threshold = 6;
+}
+
+message ProviderInfoProto {
+    required int32 provider_id = 1;
+    optional StringIdOrValueProto copyright_string = 2;
+    optional int32 vertical_pixel_offset = 3 [default = -1];
+}
+
+message PopUpProto {
+    optional bool is_balloon_style = 1 [default = false];
+    optional StringIdOrValueProto text = 2;
+    optional fixed32 background_color_abgr = 3 [default = 0xffffffff];
+    optional fixed32 text_color_abgr = 4 [default = 0xff000000];
+}
+
+message StyleAttributeProto {
+    required string style_id = 1;
+    optional int32 provider_id = 3;
+    optional fixed32 poly_color_abgr = 4 [default = 0xffffffff];
+    optional fixed32 line_color_abgr = 5 [default = 0xffffffff];
+    optional float line_width = 6 [default = 1];
+    optional fixed32 label_color_abgr = 7 [default = 0xffffffff];
+    optional float label_scale = 8 [default = 1];
+    optional fixed32 placemark_icon_color_abgr = 9 [default = 0xffffffff];
+    optional float placemark_icon_scale = 10 [default = 1];
+    optional StringIdOrValueProto placemark_icon_path = 11;
+    optional int32 placemark_icon_x = 12 [default = 0];
+    optional int32 placemark_icon_y = 13 [default = 0];
+    optional int32 placemark_icon_width = 14 [default = 32];
+    optional int32 placemark_icon_height = 15 [default = 32];
+    optional PopUpProto pop_up = 16;
+    repeated DrawFlagProto draw_flag = 17;
+}
+
+message StyleMapProto {
+    required int32 style_map_id = 1;
+    repeated int32 channel_id = 2;
+    optional int32 normal_style_attribute = 3;
+    optional int32 highlight_style_attribute = 4;
+}
+
+message ZoomRangeProto {
+    required int32 min_zoom = 1;
+    required int32 max_zoom = 2;
+}
+
+message DrawFlagProto {
+    required DrawFlagType draw_flag_type = 1;
+    enum DrawFlagType {
+        TYPE_FILL_ONLY = 1;
+        TYPE_OUTLINE_ONLY = 2;
+        TYPE_FILL_AND_OUTLINE = 3;
+        TYPE_ANTIALIASING = 4;
+        TYPE_CENTER_LABEL = 5;
+    }
+}
+
+message LayerProto {
+    repeated ZoomRangeProto zoom_range = 1;
+    optional int32 preserve_text_level = 2 [default = 30];
+    optional bool lod_begin_transition = 4;
+    optional bool lod_end_transition = 5;
+}
+
+message FolderProto {
+    optional bool is_expandable = 1 [default = true];
+}
+
+message RequirementProto {
+    optional string required_vram = 3;
+    optional string required_client_ver = 4;
+    optional string probability = 5;
+    optional string required_user_agent = 6;
+    optional string required_client_capabilities = 7;
+}
+
+message LookAtProto {
+    required float longitude = 1;
+    required float latitude = 2;
+    optional float range = 3;
+    optional float tilt = 4;
+    optional float heading = 5;
+}
+
+message NestedFeatureProto {
+    optional FeatureType feature_type = 1;
+    enum FeatureType {
+        TYPE_POINT_Z = 1;
+        TYPE_POLYGON_Z = 2;
+        TYPE_LINE_Z = 3;
+        TYPE_TERRAIN = 4;
+    }
+    
+    optional StringIdOrValueProto kml_url = 2;
+    optional string database_url = 21;
+    optional LayerProto layer = 3;
+    optional FolderProto folder = 4;
+    optional RequirementProto requirement = 5;
+    required int32 channel_id = 6;
+    optional StringIdOrValueProto display_name = 7;
+    optional bool is_visible = 8 [default = true];
+    optional bool is_enabled = 9 [default = true];
+    optional bool is_checked = 10 [default = false];
+    optional string layer_menu_icon_path = 11 [default = "icons/773_l.png"];
+    optional StringIdOrValueProto description = 12;
+    optional LookAtProto look_at = 13;
+    optional string asset_uuid = 15;
+    optional bool is_save_locked = 16 [default = true];
+    repeated NestedFeatureProto children = 17;
+    optional string client_config_script_name = 18;
+    optional int32 diorama_data_channel_base = 19 [default = -1];
+    optional int32 replica_data_channel_base = 20 [default = -1];
+}
+
+message MfeDomainFeaturesProto {
+    required string country_code = 1;
+    required string domain_name = 2;
+    
+    repeated SupportedFeature supported_features = 3;
+    enum SupportedFeature {
+        GEOCODING = 0;
+        LOCAL_SEARCH = 1;
+        DRIVING_DIRECTIONS = 2;
+    }
+}
+
+message ClientOptionsProto {
+    optional bool disable_disk_cache = 1;
+    optional bool disable_embedded_browser_vista = 2;
+    optional bool draw_atmosphere = 3 [default = true];
+    optional bool draw_stars = 4 [default = true];
+    optional string shader_file_prefix = 5;
+    optional bool use_protobuf_quadtree_packets = 6;
+    optional bool use_extended_copyright_ids = 7 [default = true];
+    
+    optional PrecipitationsOptions precipitations_options = 8;
+    message PrecipitationsOptions {
+        optional string image_url = 1;
+        optional int32 image_expire_time = 2 [default = 900];
+        optional int32 max_color_distance = 3 [default = 20];
+        optional int32 image_level = 4 [default = 5];
+        
+        repeated WeatherMapping weather_mapping = 5;
+        message WeatherMapping {
+            required uint32 color_abgr = 1;
+            
+            required WeatherType weather_type = 2;
+            enum WeatherType {
+                NO_PRECIPITATION = 0;
+                RAIN = 1;
+                SNOW = 2;
+            }
+            
+            optional float elongation = 3 [default = 1];
+            optional float opacity = 4;
+            optional float fog_density = 5;
+            optional float speed0 = 6;
+            optional float speed1 = 7;
+            optional float speed2 = 8;
+            optional float speed3 = 9;
+        }
+        
+        optional string clouds_layer_url = 6;
+        optional float animation_deceleration_delay = 7 [default = 20];
+    }
+    
+    optional CaptureOptions capture_options = 9;
+    message CaptureOptions {
+        optional bool allow_save_as_image = 1 [default = true];
+        optional int32 max_free_capture_res = 2 [default = 2400];
+        optional int32 max_premium_capture_res = 3 [default = 4800];
+    }
+    
+    optional bool show_2d_maps_icon = 10 [default = true];
+    optional bool disable_internal_browser = 11;
+    optional string internal_browser_blacklist = 12;
+    optional string internal_browser_origin_whitelist = 13 [default = "*"];
+    optional int32 polar_tile_merging_level = 14;
+    optional string js_bridge_request_whitelist = 15 [default = "http://*.google.com/*"];
+    
+    optional MapsOptions maps_options = 16;
+    message MapsOptions {
+        optional bool enable_maps = 1;
+        optional bool docs_auto_download_enabled = 2;
+        optional int32 docs_auto_download_interval = 3;
+        optional bool docs_auto_upload_enabled = 4;
+        optional int32 docs_auto_upload_delay = 5;
+    }
+}
+
+message FetchingOptionsProto {
+    optional int32 max_requests_per_query = 1 [default = 1];
+    optional bool force_max_requests_per_query = 12;
+    optional bool sort_batches = 13;
+    optional int32 max_drawable = 2 [default = 2];
+    optional int32 max_imagery = 3 [default = 2];
+    optional int32 max_terrain = 4 [default = 5];
+    optional int32 max_quadtree = 5 [default = 5];
+    optional int32 max_diorama_metadata = 6 [default = 1];
+    optional int32 max_diorama_data = 7 [default = 0];
+    optional float max_consumer_fetch_ratio = 8 [default = 1];
+    optional float max_pro_ec_fetch_ratio = 9 [default = 0];
+    optional float safe_overall_qps = 10;
+    optional float safe_imagery_qps = 11;
+    optional string domains_for_https = 14 [default = "google.com gstatic.com"];
+    optional string hosts_for_http = 15;
+}
+
+message TimeMachineOptionsProto {
+    optional string server_url = 1;
+    optional bool is_timemachine = 2;
+    optional int32 dwell_time_ms = 3 [default = 500];
+    optional int32 discoverability_altitude_meters = 4 [default = 15000];
+}
+
+message AutopiaOptionsProto {
+    optional string metadata_server_url = 1 [default = "http://cbk0.google.com/cbk"];
+    optional string depthmap_server_url = 2 [default = "http://cbk0.google.com/cbk"];
+    optional string coverage_overlay_url = 3;
+    optional float max_imagery_qps = 4;
+    optional float max_metadata_depthmap_qps = 5;
+}
+
+message CSIOptionsProto {
+    optional int32 sampling_percentage = 1;
+    optional string experiment_id = 2;
+}
+
+message SearchTabProto {
+    required bool is_visible = 1;
+    optional StringIdOrValueProto tab_label = 2;
+    optional string base_url = 3;
+    optional string viewport_prefix = 4;
+    
+    repeated InputBoxInfo input_box = 5;
+    message InputBoxInfo {
+        required StringIdOrValueProto label = 1;
+        required string query_verb = 2;
+        optional string query_prepend = 3;
+    }
+    
+    optional RequirementProto requirement = 6;
+}
+
+message CobrandProto {
+    required string logo_url = 1;
+    
+    optional Coord x_coord = 2;
+    message Coord {
+        required double value = 1 [default = 0];
+        optional bool is_relative = 2 [default = false];
+    }
+    
+    optional Coord y_coord = 3;
+    
+    optional TiePoint tie_point = 4 [default = BOTTOM_LEFT];
+    enum TiePoint {
+        TOP_LEFT = 0;
+        TOP_CENTER = 1;
+        TOP_RIGHT = 2;
+        MID_LEFT = 3;
+        MID_CENTER = 4;
+        MID_RIGHT = 5;
+        BOTTOM_LEFT = 6;
+        BOTTOM_CENTER = 7;
+        BOTTOM_RIGHT = 8;
+    }
+    
+    optional double screen_size = 5 [default = 0];
+}
+
+message DatabaseDescriptionProto {
+    optional StringIdOrValueProto database_name = 1;
+    required string database_url = 2;
+}
+
+message ConfigScriptProto {
+    required string script_name = 1;
+    required string script_data = 2;
+}
+
+message SwoopParamsProto {
+    optional double start_dist_in_meters = 1;
+}
+
+message PostingServerProto {
+    optional StringIdOrValueProto name = 1;
+    optional StringIdOrValueProto base_url = 2;
+    optional StringIdOrValueProto post_wizard_path = 3;
+    optional StringIdOrValueProto file_submit_path = 4;
+}
+
+message PlanetaryDatabaseProto {
+    required StringIdOrValueProto url = 1;
+    required StringIdOrValueProto name = 2;
+}
+
+message LogServerProto {
+    optional StringIdOrValueProto url = 1;
+    optional bool enable = 2;
+    optional int32 throttling_factor = 3 [default = 1];
+}
+
+message EndSnippetProto {
+    optional PlanetModelProto model = 1;
+    optional StringIdOrValueProto auth_server_url = 2;
+    optional bool disable_authentication = 3;
+    repeated MfeDomainFeaturesProto mfe_domains = 4;
+    optional string mfe_lang_param = 5 [default = "hl=$[hl]"];
+    optional string ads_url_patterns = 6;
+    optional StringIdOrValueProto reverse_geocoder_url = 7;
+    optional int32 reverse_geocoder_protocol_version = 8 [default = 3];
+    optional bool sky_database_is_available = 9 [default = true];
+    optional StringIdOrValueProto sky_database_url = 10;
+    optional StringIdOrValueProto default_web_page_intl_url = 11;
+    optional int32 num_start_up_tips = 12 [default = 17];
+    optional StringIdOrValueProto start_up_tips_url = 13;
+    optional int32 num_pro_start_up_tips = 51;
+    optional StringIdOrValueProto pro_start_up_tips_url = 52;
+    optional StringIdOrValueProto startup_tips_intl_url = 64;
+    optional StringIdOrValueProto user_guide_intl_url = 14;
+    optional StringIdOrValueProto support_center_intl_url = 15;
+    optional StringIdOrValueProto business_listing_intl_url = 16;
+    optional StringIdOrValueProto support_answer_intl_url = 17;
+    optional StringIdOrValueProto support_topic_intl_url = 18;
+    optional StringIdOrValueProto support_request_intl_url = 19;
+    optional StringIdOrValueProto earth_intl_url = 20;
+    optional StringIdOrValueProto add_content_url = 21;
+    optional StringIdOrValueProto sketchup_not_installed_url = 22;
+    optional StringIdOrValueProto sketchup_error_url = 23;
+    optional StringIdOrValueProto free_license_url = 24;
+    optional StringIdOrValueProto pro_license_url = 25;
+    optional StringIdOrValueProto tutorial_url = 48;
+    optional StringIdOrValueProto keyboard_shortcuts_url = 49;
+    optional StringIdOrValueProto release_notes_url = 50;
+    optional bool hide_user_data = 26 [default = false];
+    optional bool use_ge_logo = 27 [default = true];
+    optional StringIdOrValueProto diorama_description_url_base = 28;
+    optional uint32 diorama_default_color = 29 [default = 0xffc7c2c7];
+    optional StringIdOrValueProto diorama_blacklist_url = 53;
+    optional ClientOptionsProto client_options = 30;
+    optional FetchingOptionsProto fetching_options = 31;
+    optional TimeMachineOptionsProto time_machine_options = 32;
+    optional CSIOptionsProto csi_options = 33;
+    repeated SearchTabProto search_tab = 34;
+    repeated CobrandProto cobrand_info = 35;
+    repeated DatabaseDescriptionProto valid_database = 36;
+    repeated ConfigScriptProto config_script = 37;
+    optional StringIdOrValueProto deauth_server_url = 38;
+    optional SwoopParamsProto swoop_parameters = 39;
+    optional PostingServerProto bbs_server_info = 40;
+    optional PostingServerProto data_error_server_info = 41;
+    repeated PlanetaryDatabaseProto planetary_database = 42;
+    optional LogServerProto log_server = 43;
+    optional AutopiaOptionsProto autopia_options = 44;
+    
+    optional SearchConfigProto search_config = 54;
+    message SearchConfigProto {
+        repeated SearchServer search_server = 1;
+        message SearchServer {
+            optional StringIdOrValueProto name = 1;
+            optional StringIdOrValueProto url = 2;
+            
+            optional ResultType type = 3 [default = RESULT_TYPE_KML];
+            enum ResultType {
+                RESULT_TYPE_KML = 0;
+                RESULT_TYPE_XML = 1;
+            }
+            
+            optional StringIdOrValueProto html_transform_url = 4;
+            optional StringIdOrValueProto kml_transform_url = 5;
+            
+            optional SupplementalUi supplemental_ui = 6;
+            message SupplementalUi {
+                optional StringIdOrValueProto url = 1;
+                optional StringIdOrValueProto label = 2;
+                optional int32 height = 3 [default = 160];
+            }
+            
+            repeated StringIdOrValueProto suggestion = 9;
+            
+            repeated SearchletProto searchlet = 7;
+            message SearchletProto {
+                optional StringIdOrValueProto url = 1;
+                optional StringIdOrValueProto name = 2;
+                optional RequirementProto requirements = 3;
+            }
+            
+            optional RequirementProto requirements = 8;
+            optional StringIdOrValueProto suggest_server = 10;
+        }
+        
+        repeated OneboxServiceProto onebox_service = 2;
+        message OneboxServiceProto {
+            optional StringIdOrValueProto service_url = 1;
+            optional RequirementProto requirements = 2;
+        }
+        
+        optional StringIdOrValueProto kml_search_url = 3;
+        optional StringIdOrValueProto kml_render_url = 4;
+        optional StringIdOrValueProto search_history_url = 6;
+        optional StringIdOrValueProto error_page_url = 5;
+    }
+    
+    optional SearchInfoProto search_info = 45;
+    message SearchInfoProto {
+        optional string default_url = 1 [default = "http://maps.google.com/maps"];
+        optional string geocode_param = 2 [default = "q"];
+    }
+    
+    optional string elevation_service_base_url = 46 [default = "http://maps.google.com/maps/api/elevation/"];
+    optional int32 elevation_profile_query_delay = 47 [default = 500];
+    optional StringIdOrValueProto pro_upgrade_url = 55;
+    optional StringIdOrValueProto earth_community_url = 56;
+    optional StringIdOrValueProto google_maps_url = 57;
+    optional StringIdOrValueProto sharing_url = 58;
+    optional StringIdOrValueProto privacy_policy_url = 59;
+    optional bool do_gplus_user_check = 60 [default = false];
+    
+    optional RockTreeDataProto rocktree_data_proto = 61;
+    message RockTreeDataProto {
+        optional StringIdOrValueProto url = 1;
+    }
+    
+    repeated FilmstripConfigProto filmstrip_config = 62;
+    message FilmstripConfigProto {
+        optional RequirementProto requirements = 1;
+        optional StringIdOrValueProto alleycat_url_template = 2;
+        optional StringIdOrValueProto fallback_alleycat_url_template = 9;
+        optional StringIdOrValueProto metadata_url_template = 3;
+        optional StringIdOrValueProto thumbnail_url_template = 4;
+        optional StringIdOrValueProto kml_url_template = 5;
+        optional StringIdOrValueProto featured_tours_url = 6;
+        optional bool enable_viewport_fallback = 7;
+        optional uint32 viewport_fallback_distance = 8;
+        
+        repeated AlleycatImageryTypeProto imagery_type = 10;
+        message AlleycatImageryTypeProto {
+            optional int32 imagery_type_id = 1;
+            optional string imagery_type_label = 2;
+            optional StringIdOrValueProto metadata_url_template = 3;
+            optional StringIdOrValueProto thumbnail_url_template = 4;
+            optional StringIdOrValueProto kml_url_template = 5;
+        }
+    }
+    
+    optional bool show_signin_button = 63;
+    optional StringIdOrValueProto pro_measure_upsell_url = 65;
+    optional StringIdOrValueProto pro_print_upsell_url = 66;
+    
+    optional StarDataProto star_data_proto = 67;
+    message StarDataProto {
+        optional StringIdOrValueProto url = 1;
+    }
+    
+    optional StringIdOrValueProto feedback_url = 68;
+    optional StringIdOrValueProto oauth2_login_url = 69;
+}
+
+message DbRootRefProto {
+    required string url = 2;
+    optional bool is_critical = 1 [default = false];
+    optional RequirementProto requirements = 3;
+}
+
+message DatabaseVersionProto {
+    required uint32 quadtree_version = 1;
+}
+
+message DbRootProto {
+    optional StringIdOrValueProto database_name = 15;
+    optional bool imagery_present = 1 [default = true];
+    optional bool proto_imagery = 14 [default = false];
+    optional bool terrain_present = 2 [default = false];
+    repeated ProviderInfoProto provider_info = 3;
+    repeated NestedFeatureProto nested_feature = 4;
+    repeated StyleAttributeProto style_attribute = 5;
+    repeated StyleMapProto style_map = 6;
+    optional EndSnippetProto end_snippet = 7;
+    repeated StringEntryProto translation_entry = 8;
+    optional string language = 9 [default = "en"];
+    optional int32 version = 10 [default = 5];
+    repeated DbRootRefProto dbroot_reference = 11;
+    optional DatabaseVersionProto database_version = 13;
+    optional int32 refresh_timeout = 16;
+}
+
+message EncryptedDbRootProto {
+    optional EncryptionType encryption_type = 1;
+    enum EncryptionType {
+        ENCRYPTION_XOR = 0;
+    }
+    
+    optional bytes encryption_data = 2;
+    optional bytes dbroot_data = 3;
+}

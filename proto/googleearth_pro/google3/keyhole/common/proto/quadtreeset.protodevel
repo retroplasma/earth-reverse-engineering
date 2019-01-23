@@ -1,0 +1,67 @@
+syntax = "proto2";
+
+package keyhole;
+
+message QuadtreeChannel {
+    required int32 type = 1;
+    required int32 channel_epoch = 2;
+}
+
+message QuadtreeImageryTimedTile {
+    required int32 milliseconds = 1;
+    required int32 timed_tile_epoch = 2;
+    optional int32 provider = 3;
+}
+
+message QuadtreeImageryDatedTile {
+    required int32 date = 1;
+    required int32 dated_tile_epoch = 2;
+    required int32 provider = 3;
+    repeated QuadtreeImageryTimedTile timed_tiles = 4;
+}
+
+message QuadtreeImageryDates {
+    repeated QuadtreeImageryDatedTile dated_tile = 1;
+    optional int32 shared_tile_date = 2;
+    repeated int32 coarse_tile_dates = 3;
+    optional int32 shared_tile_milliseconds = 4;
+}
+
+message QuadtreeLayer {
+    required LayerType type = 1;
+    enum LayerType {
+        LAYER_TYPE_IMAGERY = 0;
+        LAYER_TYPE_TERRAIN = 1;
+        LAYER_TYPE_VECTOR = 2;
+        LAYER_TYPE_IMAGERY_HISTORY = 3;
+    }
+    
+    required int32 layer_epoch = 2;
+    optional int32 provider = 3;
+    optional QuadtreeImageryDates dates_layer = 4;
+}
+
+message QuadtreeNode {
+    optional int32 flags = 1;
+    optional int32 cache_node_epoch = 2;
+    repeated QuadtreeLayer layer = 3;
+    repeated QuadtreeChannel channel = 4;
+    
+    enum NodeFlags {
+        option allow_alias = true;
+        NODE_FLAGS_CHILD_COUNT = 4;
+        NODE_FLAGS_CACHE_BIT = 4;
+        NODE_FLAGS_DRAWABLE_BIT = 5;
+        NODE_FLAGS_IMAGE_BIT = 6;
+        NODE_FLAGS_TERRAIN_BIT = 7;
+    }
+}
+
+message QuadtreePacket {
+    required int32 packet_epoch = 1;
+    
+    repeated group SparseQuadtreeNode = 2 {
+        required int32 index = 3;
+        required QuadtreeNode Node = 4;
+    }
+}

@@ -1,0 +1,36 @@
+syntax = "proto2";
+
+package keyhole;
+
+message WaterSurfaceTileProto {
+    optional TileType tile_type = 1 [default = ALL_LAND];
+    enum TileType {
+        ALL_LAND = 1;
+        ALL_WATER = 2;
+        COAST = 3;
+    }
+    
+    repeated group Mesh = 2 {
+        optional sint32 altitude_cm = 3;
+        optional bytes x = 4;
+        optional bytes y = 5;
+        optional bytes alpha = 6;
+        repeated int32 triangle_vertices = 7;
+        
+        repeated group Strips = 8 {
+            repeated int32 vertices = 9;
+        }
+        
+        repeated group AdditionalEdgePoints = 10 {
+            optional bytes coordinate = 11;
+            optional bytes alpha = 12;
+        }
+    }
+    
+    optional bytes terrain_vertex_is_underwater = 13;
+}
+
+message TerrainPacketExtraDataProto {
+    repeated WaterSurfaceTileProto water_tile_quads = 1;
+    optional bytes original_terrain_packet = 100;
+}

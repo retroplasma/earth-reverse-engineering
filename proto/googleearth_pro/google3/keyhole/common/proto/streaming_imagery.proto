@@ -1,0 +1,28 @@
+syntax = "proto2";
+
+package keyhole;
+
+option java_package = "com.google.keyhole.common.proto";
+
+message EarthImageryPacket {
+    optional Codec image_type = 1 [default = JPEG];
+    enum Codec {
+        JPEG = 0;
+        JPEG2000 = 1;
+        DXT1 = 2;
+        DXT5 = 3;
+        PNG_RGBA = 4;
+    }
+    
+    optional bytes image_data = 2;
+    
+    optional SeparateAlphaType alpha_type = 3 [default = NONE];
+    enum SeparateAlphaType {
+        NONE = 0;
+        PNG = 1;
+        JPEG_ALPHA = 2;
+        RLE_1_BIT = 3;
+    }
+    
+    optional bytes image_alpha = 4;
+}

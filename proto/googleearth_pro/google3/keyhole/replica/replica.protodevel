@@ -1,0 +1,57 @@
+syntax = "proto2";
+
+package keyhole.replica;
+
+message ReplicaCollection {
+    required string name = 1;
+    required int32 num_models = 2;
+    required int32 num_packets = 3;
+}
+
+message ReplicaDataPacket {
+    repeated Item items = 1;
+    message Item {
+        required bytes data = 1;
+        required Codec codec = 2;
+        optional int32 model_index = 3;
+        optional string name = 4;
+        optional int32 maximum_display_distance = 5;
+    }
+    
+    enum Codec {
+        NO_CODEC = 0;
+        JP2 = 1;
+        DIO_GEOMETRY = 2;
+        DDS = 3;
+        SPT = 4;
+        ZIPPED_SPT = 5;
+        PNG = 6;
+    }
+}
+
+message ReplicaInstanceSet {
+    required string collection_name = 1;
+    
+    repeated Model models = 2;
+    message Model {
+        required int32 model_index = 1;
+        required int32 num_instances = 2;
+        optional bool is_relative_to_surface = 3 [default = false];
+    }
+    
+    repeated Instance instances = 3;
+    message Instance {
+        required sint32 x = 1;
+        required sint32 y = 2;
+        required sint32 z = 3;
+        optional int32 scale = 4 [default = 100];
+        optional int32 z_rotation = 5;
+    }
+    
+    optional int32 distance_between_instances_cm = 4;
+}
+
+message ReplicaTile {
+    repeated ReplicaCollection collections = 1;
+    repeated ReplicaInstanceSet instance_sets = 2;
+}

@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+package earth_client_libs_evll_render_proto_stars;
+
+message StarData {
+    repeated Star stars = 1;
+    message Star {
+        optional int32 x = 1;
+        optional int32 y = 2;
+        optional int32 z = 3;
+        optional uint32 magnitude = 4;
+        optional uint32 temperature = 5;
+    }
+}

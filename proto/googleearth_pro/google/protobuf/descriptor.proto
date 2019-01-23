@@ -1,0 +1,203 @@
+syntax = "proto2";
+
+package google.protobuf;
+
+option optimize_for = SPEED;
+option java_outer_classname = "DescriptorProtos";
+option java_package = "com.google.protobuf";
+
+message FileDescriptorSet {
+    repeated FileDescriptorProto file = 1;
+}
+
+message FileDescriptorProto {
+    optional string name = 1;
+    optional string package = 2;
+    repeated string dependency = 3;
+    repeated int32 public_dependency = 10;
+    repeated int32 weak_dependency = 11;
+    repeated DescriptorProto message_type = 4;
+    repeated EnumDescriptorProto enum_type = 5;
+    repeated ServiceDescriptorProto service = 6;
+    repeated FieldDescriptorProto extension = 7;
+    optional FileOptions options = 8;
+    optional SourceCodeInfo source_code_info = 9;
+}
+
+message DescriptorProto {
+    optional string name = 1;
+    repeated FieldDescriptorProto field = 2;
+    repeated FieldDescriptorProto extension = 6;
+    repeated DescriptorProto nested_type = 3;
+    repeated EnumDescriptorProto enum_type = 4;
+    
+    repeated ExtensionRange extension_range = 5;
+    message ExtensionRange {
+        optional int32 start = 1;
+        optional int32 end = 2;
+    }
+    
+    optional MessageOptions options = 7;
+}
+
+message FieldDescriptorProto {
+    optional string name = 1;
+    optional int32 number = 3;
+    
+    optional Label label = 4;
+    enum Label {
+        LABEL_OPTIONAL = 1;
+        LABEL_REQUIRED = 2;
+        LABEL_REPEATED = 3;
+    }
+    
+    optional Type type = 5;
+    enum Type {
+        TYPE_DOUBLE = 1;
+        TYPE_FLOAT = 2;
+        TYPE_INT64 = 3;
+        TYPE_UINT64 = 4;
+        TYPE_INT32 = 5;
+        TYPE_FIXED64 = 6;
+        TYPE_FIXED32 = 7;
+        TYPE_BOOL = 8;
+        TYPE_STRING = 9;
+        TYPE_GROUP = 10;
+        TYPE_MESSAGE = 11;
+        TYPE_BYTES = 12;
+        TYPE_UINT32 = 13;
+        TYPE_ENUM = 14;
+        TYPE_SFIXED32 = 15;
+        TYPE_SFIXED64 = 16;
+        TYPE_SINT32 = 17;
+        TYPE_SINT64 = 18;
+    }
+    
+    optional string type_name = 6;
+    optional string extendee = 2;
+    optional string default_value = 7;
+    optional FieldOptions options = 8;
+}
+
+message EnumDescriptorProto {
+    optional string name = 1;
+    repeated EnumValueDescriptorProto value = 2;
+    optional EnumOptions options = 3;
+}
+
+message EnumValueDescriptorProto {
+    optional string name = 1;
+    optional int32 number = 2;
+    optional EnumValueOptions options = 3;
+}
+
+message ServiceDescriptorProto {
+    optional string name = 1;
+    repeated MethodDescriptorProto method = 2;
+    optional ServiceOptions options = 3;
+}
+
+message MethodDescriptorProto {
+    optional string name = 1;
+    optional string input_type = 2;
+    optional string output_type = 3;
+    optional MethodOptions options = 4;
+}
+
+message FileOptions {
+    optional string java_package = 1;
+    optional string java_outer_classname = 8;
+    optional bool java_multiple_files = 10 [default = false];
+    optional bool java_generate_equals_and_hash = 20 [default = false];
+    
+    optional OptimizeMode optimize_for = 9 [default = SPEED];
+    enum OptimizeMode {
+        SPEED = 1;
+        CODE_SIZE = 2;
+        LITE_RUNTIME = 3;
+    }
+    
+    optional string go_package = 11;
+    optional bool cc_generic_services = 16 [default = false];
+    optional bool java_generic_services = 17 [default = false];
+    optional bool py_generic_services = 18 [default = false];
+    repeated UninterpretedOption uninterpreted_option = 999;
+    
+    extensions 1000 to max;
+}
+
+message MessageOptions {
+    optional bool message_set_wire_format = 1 [default = false];
+    optional bool no_standard_descriptor_accessor = 2 [default = false];
+    repeated UninterpretedOption uninterpreted_option = 999;
+    
+    extensions 1000 to max;
+}
+
+message FieldOptions {
+    optional CType ctype = 1 [default = STRING];
+    enum CType {
+        STRING = 0;
+        CORD = 1;
+        STRING_PIECE = 2;
+    }
+    
+    optional bool packed = 2;
+    optional bool lazy = 5 [default = false];
+    optional bool deprecated = 3 [default = false];
+    optional string experimental_map_key = 9;
+    optional bool weak = 10 [default = false];
+    repeated UninterpretedOption uninterpreted_option = 999;
+    
+    extensions 1000 to max;
+}
+
+message EnumOptions {
+    optional bool allow_alias = 2 [default = true];
+    repeated UninterpretedOption uninterpreted_option = 999;
+    
+    extensions 1000 to max;
+}
+
+message EnumValueOptions {
+    repeated UninterpretedOption uninterpreted_option = 999;
+    
+    extensions 1000 to max;
+}
+
+message ServiceOptions {
+    repeated UninterpretedOption uninterpreted_option = 999;
+    
+    extensions 1000 to max;
+}
+
+message MethodOptions {
+    repeated UninterpretedOption uninterpreted_option = 999;
+    
+    extensions 1000 to max;
+}
+
+message UninterpretedOption {
+    repeated NamePart name = 2;
+    message NamePart {
+        required string name_part = 1;
+        required bool is_extension = 2;
+    }
+    
+    optional string identifier_value = 3;
+    optional uint64 positive_int_value = 4;
+    optional int64 negative_int_value = 5;
+    optional double double_value = 6;
+    optional bytes string_value = 7;
+    optional string aggregate_value = 8;
+}
+
+message SourceCodeInfo {
+    repeated Location location = 1;
+    message Location {
+        repeated int32 path = 1 [packed = true];
+        repeated int32 span = 2 [packed = true];
+        optional string leading_comments = 3;
+        optional string trailing_comments = 4;
+    }
+}

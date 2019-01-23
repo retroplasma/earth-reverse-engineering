@@ -1,0 +1,100 @@
+syntax = "proto2";
+
+package keyhole;
+
+message DioramaMetadata {
+    optional int32 max_absolute_altitude = 14;
+    optional int32 max_relative_altitude = 15;
+    optional int32 provider_id = 19;
+    
+    repeated group Object = 16 {
+        optional int32 flags = 1;
+        optional int32 lod_parent = 2;
+        optional fixed64 lod_parent_tile = 18;
+        optional int32 id_at_source = 3;
+        optional int32 offset_to_source = 4;
+        optional fixed64 absolute_source = 5;
+    }
+    
+    repeated group DataPacket = 17 {
+        optional int32 num_objects = 8;
+        required int32 max_altitude = 9;
+        optional int32 min_altitude = 10;
+        required int32 version = 11;
+        optional int32 max_absolute_altitude = 12;
+        optional int32 min_absolute_altitude = 13;
+    }
+    
+    enum ObjectFlags {
+        option allow_alias = true;
+        IS_GEOMETRY = 4;
+        NORTH = 0;
+        SOUTH = 1;
+        EAST = 2;
+        WEST = 3;
+        OWNER_DIRECTION_MASK = 3;
+        IS_GROUP = 8;
+        LOD_PARENT_HERE = 16;
+        IS_INSTANCE = 32;
+    }
+}
+
+message DioramaQuadset {
+    repeated DioramaMetadata metadata = 25;
+    required bytes tree_bits = 26;
+}
+
+message DioramaDataPacket {
+    repeated group Objects = 16 {
+        required bytes data = 1;
+        required Codec codec = 2;
+        optional int32 provider_id = 3;
+        repeated float texture_sub_window = 4;
+        optional int32 rotate_90_ccw_in_lod_parent = 8;
+        optional ClampMode texture_clamp_mode = 5;
+        optional bytes bounding_box = 6;
+        repeated int32 use_texture_object_id = 7;
+        repeated fixed64 lod_child_tile = 21;
+        optional double relative_altitude_anchor_lat = 9;
+        optional double relative_altitude_anchor_lng = 10;
+        optional float relative_altitude_anchor_elevation = 19;
+        optional AltitudeMode altitude_mode = 18;
+        optional string description_id = 11;
+        optional bool building_has_info_bubble = 20 [default = true];
+        optional fixed64 previous_chunk_path = 12;
+        optional int32 previous_chunk_channel = 13;
+        optional int32 previous_chunk_object = 14;
+        optional int32 reduce_resolution_levels = 15;
+        optional bytes concatenated_data = 16;
+        optional bool has_next_chunk = 17;
+    }
+    
+    enum Codec {
+        NO_CODEC = 0;
+        JPEG = 1;
+        PNG = 2;
+        DXT = 3;
+        JP2 = 4;
+        HARDWARE_COMPRESSED_IMAGE = 5;
+        DIO_GEOMETRY = 101;
+        BUILDING_Z = 102;
+        DIO_ANIMATED_GEOMETRY = 103;
+    }
+    
+    enum ClampMode {
+        CLAMP_S_CLAMP_T = 1;
+        CLAMP_S_WRAP_T = 2;
+        WRAP_S_CLAMP_T = 3;
+        WRAP_S_WRAP_T = 4;
+    }
+    
+    enum AltitudeMode {
+        RELATIVE_TO_SURFACE = 0;
+        RELATIVE_TO_SEA_FLOOR = 1;
+        ABSOLUTE_ALTITUDE = 2;
+    }
+}
+
+message DioramaBlacklist {
+    repeated string building_id = 1;
+}
