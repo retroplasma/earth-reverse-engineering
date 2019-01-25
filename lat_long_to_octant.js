@@ -25,7 +25,21 @@ async function run() {
 		process.exit(1);
 	}
 
-	await latLongToOctant(parseFloat(lat), parseFloat(lon), MAX_LEVEL, console.log);	
+	[lat, lon] = [parseFloat(lat), parseFloat(lon)];
+	const foundOctants = await latLongToOctant(lat, lon, MAX_LEVEL);
+
+	console.log(lat + ', ' + lon);
+	console.log('-------------');
+
+	for (let octantLevel in foundOctants) {
+		let octants = foundOctants[octantLevel].octants;
+		let box = foundOctants[octantLevel].box;
+		console.log("Octant Level:", octantLevel);
+		console.log(box);
+		for (let i = 0; i < octants.length; i++) {
+			console.log("    " + octants[i]);
+		}
+	}
 }
 
 /****************************************************************/
