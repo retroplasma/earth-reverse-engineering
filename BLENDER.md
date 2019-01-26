@@ -1,20 +1,21 @@
-We can use Blender to see if it worked:
+The obj files aren't centered or resized per default. This Node.js script takes care of that and produces `model.2.obj` from `model.obj`:
+```
+node center_scale_obj.js
+```
 
-- File -> Import -> Wavefront (.obj)
-- Nothing appears? It should be somewhere outside the viewport. Select a "planet" object from the list and move view to selection center like this:
-  ![select object](https://user-images.githubusercontent.com/46618410/51100320-6878ea00-17cd-11e9-82f8-fbf6deff5609.jpg)
-- Add "Hemi" lamp
-- Set "Viewport Shading" to "Rendered"
+We can use Blender to see how it looks:
+- File -> Import -> Wavefront (.obj) -> `./downloaded_files/obj/.../model.2.obj`
+- Add "Hemi" lamp:
+![hemi lamp](https://user-images.githubusercontent.com/46618410/51717795-4c314480-203a-11e9-8f53-1ba1c9d0cace.png "hemi lamp")
+- Set "Viewport Shading" to "Rendered":
+![viewport shading](https://user-images.githubusercontent.com/46618410/51717879-9d413880-203a-11e9-98dd-954136d9a962.png "viewport shading")
 
 Textures look weird? Try this Blender Script for correct texture extension:
 ```
 for x in bpy.data.textures: x.extension = 'EXTEND'
 ```
+Here's how to open the script console:
+![python console](https://user-images.githubusercontent.com/46618410/51717769-2c9a1c00-203a-11e9-833b-20752f30a736.png "python console")
 
-Everything jitters? Try to scale and move the model. You can use this node.js script and then open `model.2.obj` instead of `model.obj` (constants for scaling/moving are inside the script):
-```
-node scale_move_obj.js
-``` 
-
-Here's how the result (octant 20527061605273514, max-level 20) should look like:
+The result (octant 20527061605273514, max-level 20) should look like this:
 ![example](example.jpg "example")
