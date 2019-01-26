@@ -23,85 +23,26 @@ async function run() {
 	const planetoid = await getPlanetoid();
 	const rootEpoch = planetoid.bulkMetadataEpoch[0];
 
-	const objDir = path.join(DUMP_OBJ_DIR, `${OCTANTS.join('+')}-${MAX_LEVEL}-${rootEpoch}`);
+	let objCtx;
 	if (DUMP_OBJ) {
+		const objDir = path.join(DUMP_OBJ_DIR, `${OCTANTS.join('+')}-${MAX_LEVEL}-${rootEpoch}`);
 		fs.removeSync(objDir);
 		fs.ensureDirSync(objDir);
+		objCtx = initCtxOBJ(objDir);
 	}
 
-	const sem = semaphore((PARALLEL_SEARCH ? 16 : 1) - 1);
-
-	async function checkNodeAtNodePath(nodePath) {
-		let bulk = null, index = -1;
-		for (let epoch = rootEpoch, i = 4; i < nodePath.length + 4; i += 4) {
-			const bulkPath = nodePath.substring(0, i - 4);
-			const subPath = nodePath.substring(0, i);
-
-			if (bulk) {
-				const idx = getIndexByPath(bulk, bulkPath);
-				if (hasBulkMetadataAtIndex(bulk, idx)) return null;
-			}
-
-			const nextBulk = await getBulk(bulkPath, epoch);
-
-			bulk = nextBulk;
-			index = getIndexByPath(bulk, subPath);
-			epoch = bulk.bulkMetadataEpoch[index];
-		}
-		if (index < 0) return null;
-		if (!hasNodeAtIndex(bulk, index)) return null;
-		return { bulk, index };
-	}
-
-	async function getNodeFromNodePath(nodePath) {
-		const check = await checkNodeAtNodePath(nodePath, true);
-		if (!check) return null;
-
-		return await getNode(nodePath, check.bulk, check.index);
-	}
-
-	const objCtx = DUMP_OBJ && initCtxOBJ(objDir);
 	let octants = 0;
 
-	async function search(k, level = 999) {
-		if (k.length > level) return false;
-
-		try {
-			const check = await checkNodeAtNodePath(k);
-			if (check === null) return false;
-			console.log('found', k);
+	const search = initNodeSearch(rootEpoch, PARALLEL_SEARCH ? 16 : 1,
+		function nodeFound(path) {
+			console.log('found', path);
 			octants++;
-		} catch (ex) {
-			console.error(ex)
-			return false;
+		},
+		function nodeDownloaded(path, node, octantsToExclude) {
+			console.log('downloaded', path);
+			DUMP_OBJ && writeNodeOBJ(objCtx, node, path, octantsToExclude);
 		}
-
-		const promises = [];
-		const results = [];
-
-		for (const oct of [0, 1, 2, 3, 4, 5, 6, 7]) {
-			const promise = (async function fn() {
-				try {
-					results.push({ oct, res: await search(k + oct, level) });
-					if (results.length === 8) {
-						const octs = results.filter(({ res }) => res).map(({ oct }) => oct)
-						const node = await getNodeFromNodePath(k);
-						console.log('downloaded', k);
-						DUMP_OBJ && writeNodeOBJ(objCtx, node, k, octs);
-					}
-				} finally {
-					await new Promise((r, _) => setImmediate(r));
-					sem.signal();
-				}
-			})();
-			await sem.wait(true);
-			promises.push(promise);
-		}
-
-		await Promise.all(promises);
-
-		return true;
-	}
+	);
 
 	for (const oct of OCTANTS) {
 		await search(oct, MAX_LEVEL);
@@ -111,9 +52,88 @@ async function run() {
 }
 /****************************************************************/
 
+/**************************** search ****************************/
+function initNodeSearch(rootEpoch, numParallelBranches = 1, nodeFound = null, nodeDownloaded = null) {
+	const sem = semaphore(numParallelBranches - 1);
 
+	return async function search(k, maxLevel = 999) {
+		if (k.length > maxLevel) return false;
 
-/**************************** helper ****************************/
+		let check;
+		try {
+			check = await checkNodeAtNodePath(rootEpoch, k);
+			if (check === null) return false;
+		} catch (ex) {
+			console.error(ex);
+			return false;
+		}
+
+		try {
+			nodeFound && nodeFound(k);
+		} catch (ex) {
+			console.error('Unhandled nodeFound callback error', ex);
+			return false;
+		}
+
+		const [promises, results] = [[], []];
+
+		for (const oct of [0, 1, 2, 3, 4, 5, 6, 7]) {
+			promises.push((async function fn() {
+				try {
+					results.push({ oct, res: await search(k + oct, maxLevel) });
+					if (results.length === 8) {
+						const octs = results.filter(({ res }) => res).map(({ oct }) => oct)
+						const node = await getNode(k, check.bulk, check.index);
+						try {
+							nodeDownloaded && nodeDownloaded(k, node, octs);
+						} catch (ex) {
+							console.error('Unhandled nodeDownload callback error');
+							throw ex;
+						}
+					}
+				} finally {
+					await new Promise((r, _) => setImmediate(r));
+					sem.signal();
+				}
+			})());
+
+			await sem.wait(true);
+		}
+
+		try {
+			await Promise.all(promises);
+		} catch (ex) {
+			console.error(ex);
+			return false;
+		}
+		return true;
+	};
+}
+
+async function checkNodeAtNodePath(rootEpoch, nodePath) {
+	let bulk = null, index = -1;
+	for (let epoch = rootEpoch, i = 4; i < nodePath.length + 4; i += 4) {
+		const bulkPath = nodePath.substring(0, i - 4);
+		const subPath = nodePath.substring(0, i);
+
+		if (bulk) {
+			const idx = getIndexByPath(bulk, bulkPath);
+			if (hasBulkMetadataAtIndex(bulk, idx)) return null;
+		}
+
+		const nextBulk = await getBulk(bulkPath, epoch);
+
+		bulk = nextBulk;
+		index = getIndexByPath(bulk, subPath);
+		epoch = bulk.bulkMetadataEpoch[index];
+	}
+	if (index < 0) return null;
+	if (!hasNodeAtIndex(bulk, index)) return null;
+	return { bulk, index };
+}
+/****************************************************************/
+
+/**************************** export ****************************/
 function initCtxOBJ(dir) {
 	fs.writeFileSync(path.join(dir, 'model.obj'), `mtllib model.mtl\n`);
 	return { objDir: dir, c_v: 0, c_n: 0, c_u: 0 };
@@ -127,7 +147,6 @@ function writeNodeOBJ(ctx, node, nodeName, exclude) {
 
 		const obj = writeMeshOBJ(ctx, meshName, texName, node, mesh, exclude);
 		fs.appendFileSync(path.join(ctx.objDir, 'model.obj'), obj);
-
 
 		const { buffer: buf, extension: ext } = decodeTexture(tex);
 		fs.appendFileSync(path.join(ctx.objDir, 'model.mtl'), `
@@ -293,7 +312,9 @@ function writeMeshOBJ(ctx, meshName, texName, payload, mesh, exclude) {
 
 	return str;
 }
+/****************************************************************/
 
+/**************************** helper ****************************/
 function semaphore(num) {
 	let concurrent = num;
 	const waiting = [];
@@ -323,8 +344,8 @@ function semaphore(num) {
 		}
 	};
 }
-
 /****************************************************************/
+
 (async function program() {
 	await run();
 })().then(() => {
