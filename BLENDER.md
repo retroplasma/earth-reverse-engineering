@@ -14,7 +14,7 @@ Textures look weird? Try this Blender Script for correct texture extension:
 ```
 for x in bpy.data.textures: x.extension = 'EXTEND'
 ```
-Example where we can clearly see what the script does (before and after):
+It removes the "tearing" on the edges of meshes. Before and after example:
 ![weird textures](https://user-images.githubusercontent.com/46618410/51794380-9f85cd00-21c9-11e9-87ba-f77d691efaea.png "weird textures")
 
 Here's how to open the script console:
