@@ -20,7 +20,9 @@ Exported files will be in `./downloaded_files/obj`. They can be opened in Blende
 
 #### Notes
 
-Alternative method for finding octant: [Open maps and dev tools, switch to satellite, fly to destination, search for NodeData, copy octant path from recent request](how_to_find_octant.jpg)
+Alternative methods for finding octants:
+- LexSong wrote a Python script that takes North/East South/West coordinates: https://github.com/retroplasma/earth-reverse-engineering/issues/25.
+- Manually: [Open maps and dev tools, switch to satellite, fly to destination, search for NodeData, copy octant path from recent request](how_to_find_octant.jpg)
 
 You can use this to dump json and raw data instead of obj:
 ```
