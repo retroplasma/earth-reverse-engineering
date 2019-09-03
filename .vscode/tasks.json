@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build",
+			"command": "sh build.sh",
+			"options": {
+				"cwd": "${workspaceFolder}/client"
+			},
+			"type": "shell",
+			"group": "build",
+			"problemMatcher": [
+				"$gcc"
+			]
+		}
+	]
+}

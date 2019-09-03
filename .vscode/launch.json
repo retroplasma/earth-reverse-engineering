@@ -1,0 +1,33 @@
+{
+	// Verwendet IntelliSense zum Ermitteln möglicher Attribute.
+	// Zeigen Sie auf vorhandene Attribute, um die zugehörigen Beschreibungen anzuzeigen.
+	// Weitere Informationen finden Sie unter https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "Convert LatLong to Octant",
+			"program": "${workspaceFolder}/lat_long_to_octant.js",
+			"args": ["37.420806884765625", "-122.08419799804688"]
+		},
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "Dump Obj",
+			"program": "${workspaceFolder}/dump_obj.js",
+			"args": ["20", "2"] // "20527061605273514", "20"
+		},
+		{
+			"type":"cppdbg",
+			"request": "launch",
+			"name": "C Debug",
+			"program": "${workspaceFolder}/client/main",
+			"cwd": "${workspaceFolder}/client",
+			"preLaunchTask": "build",
+			"osx": {
+				"MIMode": "lldb"
+			}
+		}
+	]
+}
