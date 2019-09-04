@@ -3,15 +3,21 @@
 	"tasks": [
 		{
 			"label": "build",
+			"type": "shell",
 			"command": "sh build.sh",
+			"problemMatcher": [
+				"$gcc"
+			],
 			"options": {
 				"cwd": "${workspaceFolder}/client"
 			},
-			"type": "shell",
-			"group": "build",
-			"problemMatcher": [
-				"$gcc"
-			]
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"windows": {
+				"command": "build.bat"
+			}
 		}
 	]
 }

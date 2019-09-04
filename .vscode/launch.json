@@ -5,6 +5,19 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			"name": "(Windows) Debug",
+			"type": "cppvsdbg",
+			"request": "launch",
+			"program": "${workspaceFolder}/client/main.exe",
+			"cwd": "${workspaceFolder}/client",
+			"args": [],
+			"preLaunchTask": "build",
+			"stopAtEntry": false,
+			"symbolSearchPath": "${workspaceFolder}/client",
+			"environment": [],
+			"externalConsole": true
+		},
+		{
 			"type": "node",
 			"request": "launch",
 			"name": "Convert LatLong to Octant",

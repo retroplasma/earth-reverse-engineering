@@ -64,4 +64,10 @@ typings/
 downloaded_files/
 
 client/main
+*.exe
+*.dll
+*.idb
+*.pdb
 *.dSYM
+*.pb.h
+*.pb.cc
