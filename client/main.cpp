@@ -169,14 +169,14 @@ int unpackIndices(std::string packed, unsigned short** indices) {
 	return e;
 }
 
-// from minified js
+// from minified js (only positions)
 int unpackVertices(std::string packed, unsigned char** vertices) {
 	int i = 0;
 	int h = packed.size();
 	int k = h / 3;
 	*vertices = new unsigned char[8 * k];
-	for (int m = 0; 2 >= m; m++) { // m == stride
-		int p = packed[i++];
+	for (int m = 0; m < 3; m++) { // m == stride
+		int p = (unsigned char)packed[i++];
 		(*vertices)[m] = p;
 		for (int v = 1; v < k; v++) {
 			p = (p + packed[i++]) & 0xFF;
@@ -184,6 +184,29 @@ int unpackVertices(std::string packed, unsigned char** vertices) {
 		}
 	}
 	return 8 * k;
+}
+
+// from minified js
+void unpackTexCoords(std::string packed, unsigned char* vertices, int vertices_len) {
+	int h = vertices_len / 8;
+
+	int i = 0;
+	int k = (unsigned char)packed[i++];
+	k += (unsigned char)packed[i++] << 8; // 65535
+	int g = (unsigned char)packed[i++];
+	g += (unsigned char)packed[i++] << 8; // 65535
+	int m = 0, p = 0;
+	for (int B = 0; B < h; B++) {
+		m = (m + ((unsigned char)packed[i + 0 * h + B] + 
+				 ((unsigned char)packed[i + 2 * h + B] << 8))) & k; // 18418
+		p = (p + ((unsigned char)packed[i + 1 * h + B] + 
+				 ((unsigned char)packed[i + 3 * h + B] << 8))) & g; // 49234
+		int A = 8 * B + 4;
+		vertices[A + 0] = m & 0xFF;
+		vertices[A + 1] = m >> 8;
+		vertices[A + 2] = p & 0xFF;
+		vertices[A + 3] = p >> 8;
+	}
 }
 
 int main(int argc, char* argv[]) {
@@ -212,6 +235,7 @@ int main(int argc, char* argv[]) {
 					unsigned char* vertices;
 					int indices_len = unpackIndices(mesh.indices(), &indices); // big endian u16
 					int vertices_len = unpackVertices(mesh.vertices(), &vertices);
+					unpackTexCoords(mesh.texture_coordinates(), vertices, vertices_len);
 					for (int i = 0; i < vertices_len; i += 8) {
 						printf("x: %d y: %d z: %d\n", 
 							vertices[i + 0],
