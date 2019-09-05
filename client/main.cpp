@@ -1,12 +1,25 @@
+#include <fstream>
 #include <SDL.h>
+#if defined(_WIN32) || defined(__linux__)
+	#include <glad/glad.h>
+	#include "gl2/src/glad.c"
+#else
+	#define GL_GLEXT_PROTOTYPES
+#endif
 #include <SDL_opengl.h>
 
 #define HTTP_IMPLEMENTATION
 #include "http.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #include "proto/rocktree.pb.h"
 #include "proto/rocktree.pb.cc"
 using namespace geo_globetrotter_proto_rocktree;
+
+#include "vector_math.h"
+
+SDL_Window* sdl_window;
 
 const int MAX_LEVEL = 20;
 
@@ -166,6 +179,9 @@ int unpackIndices(std::string packed, unsigned short** indices) {
 		B || k++;
 	}
 	// g == numNonDegenerateTriangles
+
+	// TODO: make buffer of nondegenerates
+
 	return e;
 }
 
@@ -209,7 +225,13 @@ void unpackTexCoords(std::string packed, unsigned char* vertices, int vertices_l
 	}
 }
 
-int main(int argc, char* argv[]) {
+struct Mesh {
+	GLuint vertices_buffer;
+	GLuint indices_buffer;
+	int element_count;
+} planet_mesh;
+
+void loadPlanet() {
 	PlanetoidMetadata* planetoid = getPlanetoid();
 	printf("earth radius: %f\n", planetoid->radius());
 	int root_epoch = planetoid->root_node_metadata().epoch();
@@ -228,22 +250,62 @@ int main(int argc, char* argv[]) {
 			if (flags & NodeMetadata_Flags_USE_IMAGERY_EPOCH) {
 				imagery_epoch = root_bulk->default_imagery_epoch();
 			}
-			NodeData* node = getNode(path, root_epoch, Texture_Format_JPG, imagery_epoch);
+			NodeData* node = getNode(path, root_epoch, Texture_Format_DXT1, imagery_epoch);
 			if (node) {
 				for (auto mesh : node->meshes()) {
 					unsigned short* indices;
 					unsigned char* vertices;
-					int indices_len = unpackIndices(mesh.indices(), &indices); // big endian u16
+					int indices_len = unpackIndices(mesh.indices(), &indices);
 					int vertices_len = unpackVertices(mesh.vertices(), &vertices);
 					unpackTexCoords(mesh.texture_coordinates(), vertices, vertices_len);
-					for (int i = 0; i < vertices_len; i += 8) {
-						printf("x: %d y: %d z: %d\n", 
-							vertices[i + 0],
-							vertices[i + 1],
-							vertices[i + 2]);
+					
+					// remove degenerates
+					unsigned short* indices2 = new unsigned short[indices_len];
+					int indices2_len = 0;
+					for (int i = 0; i < indices_len - 2; i++) {
+						int a = indices[i + 0];
+						int b = indices[i + 1];
+						int c = indices[i + 2];
+						if (a == b || a == c || b == c) continue;
+						// TODO: if (i & 1) reverse winding
+						indices2[indices2_len++] = a;
+						indices2[indices2_len++] = b;
+						indices2[indices2_len++] = c;
+					}
+
+					glGenBuffers(1, &planet_mesh.vertices_buffer);
+					glBindBuffer(GL_ARRAY_BUFFER, planet_mesh.vertices_buffer);
+					glBufferData(GL_ARRAY_BUFFER, vertices_len * sizeof(unsigned char), vertices, GL_STATIC_DRAW);
+					glGenBuffers(1, &planet_mesh.indices_buffer);
+					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planet_mesh.indices_buffer);
+					glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices2_len * sizeof(unsigned short), indices2, GL_STATIC_DRAW);
+					planet_mesh.element_count = indices_len;
+
+					delete [] indices;
+					delete [] indices2;
+					delete [] vertices;
+
+					assert(mesh.texture().size == 1);
+					auto tex = mesh.texture().at(0);
+					if (tex.format() == Texture_Format_JPG) {
+						printf("tex format: %d\n", tex.format());
+						std::ofstream outfile;
+						outfile.open("tex.jpg", std::ios::out | std::ios::trunc | std::ios::binary);
+						assert(tex.data().size == 1); // else we have to concatenate
+						for (std::string data : tex.data()) {
+							outfile << data;
+						}
+						outfile.close();
+					}
+					int width, height, comp;
+					unsigned char* pixels = stbi_load("tex.jpg", &width, &height, &comp, 3);
+					if (!pixels) {
+						fprintf(stderr, "Could not load texture\n");
 					}
 				}
 				delete node;
+
+				return; // stop after first node for now
 			}
 		}
 
@@ -259,6 +321,159 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
+}
+
+GLuint makeShader(const char* vert_src, const char* frag_src) {
+	GLuint vert_shader = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vert_shader, 1, &vert_src, NULL);
+	glCompileShader(vert_shader);
+	GLuint frag_shader = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(frag_shader, 1, &frag_src, NULL);
+	glCompileShader(frag_shader);
+	GLuint program = glCreateProgram();
+	glAttachShader(program, vert_shader);
+	glAttachShader(program, frag_shader);
+	glLinkProgram(program);
+	glDetachShader(program, vert_shader);
+	glDetachShader(program, frag_shader);
+	glDeleteShader(vert_shader);
+	glDeleteShader(frag_shader);
+	return program;
+}
+
+GLuint program;
+GLint transform_loc;
+GLint color_loc;
+void initGL() {
+	program = makeShader(
+		"uniform mat4 transform;"
+		"attribute vec3 position;"
+		"void main() {"
+		"	gl_Position = transform * vec4(position, 1.0);"
+		"}",
+
+		"#ifdef GL_ES\n"
+		"precision mediump float;\n"
+		"#endif\n"
+		"uniform vec3 color;"
+		"void main() {"
+		"	gl_FragColor = vec4(color, 1.0);"
+		"}"
+	);
+	glUseProgram(program);
+	transform_loc = glGetUniformLocation(program, "transform");
+	color_loc = glGetUniformLocation(program, "color");
+}
+
+void drawPlanet() {
+	int width, height;
+	SDL_GL_GetDrawableSize(sdl_window, &width, &height);
+	glViewport(0, 0, width, height);
+	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glUseProgram(program);
+	mat4_t transform;
+	float s = 1.0f / 4.0f;
+	MatrixScale(vec3_t {s, s, s}, transform);
+	MatrixOrtho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f, transform);
+	//MatrixIdentity(transform);
+	static float angle = 0.0f;
+	angle += 0.02f;
+	MatrixRotation(vec3_t {0.0f, 1.0f, 0.0f}, angle, transform);
+	glUniformMatrix4fv(transform_loc, 1, GL_FALSE, transform);
+
+	glUniform3f(color_loc, 1.0f, 0.0f, 1.0f);
+
+	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, planet_mesh.vertices_buffer);
+	glVertexAttribPointer(0, 3, GL_UNSIGNED_BYTE, GL_TRUE, 8, NULL);
+	//glDrawArrays(GL_TRIANGLES, 0, 3);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planet_mesh.indices_buffer);
+	glDrawElements(GL_TRIANGLES, planet_mesh.element_count, GL_UNSIGNED_SHORT, NULL);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	SDL_GL_SwapWindow(sdl_window);
+}
+
+bool quit = false;
+void mainloop() {
+	SDL_Event sdl_event;
+	while (SDL_PollEvent(&sdl_event)) {
+		switch (sdl_event.type) {
+			case SDL_QUIT:
+				quit = true;
+				break;
+			case SDL_KEYDOWN:
+				if (sdl_event.key.keysym.sym == SDLK_ESCAPE) quit = true;
+				break;
+#ifdef EMSCRIPTEN // Touch controls
+			case SDL_FINGERDOWN: {
+				float x = sdl_event.tfinger.x;
+				float y = sdl_event.tfinger.y;
+			} break;
+#endif
+		}
+	}
+
+	drawPlanet();
+}
+
+int main(int argc, char* argv[]) {
+	int video_width = 512;
+	int video_height = 512;
+
+	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+		fprintf(stderr, "Couldn't init SDL2: %s\n", SDL_GetError());
+		exit(1);
+	}
+#ifdef EMSCRIPTEN
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+		SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK,
+		SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+#endif
+	//SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+	//SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
+	sdl_window = SDL_CreateWindow("Earth Client", 
+		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
+		video_width, video_height, 
+		SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+	if (!sdl_window) {
+		fprintf(stderr, "Couldn't create window: %s\n", SDL_GetError());
+		exit(1);
+	}
+	SDL_GLContext gl_context = SDL_GL_CreateContext(sdl_window);
+	if (!gl_context) {
+		fprintf(stderr, "Couldn't create OpenGL context: %s\n", SDL_GetError());
+		exit(1);
+	}
+	SDL_GL_SetSwapInterval(1);
+
+#if defined(_WIN32) || defined(__linux__)
+	// init glad
+	if (!gladLoadGL()) {
+		fprintf(stderr, "Failed to init glad\n");
+		exit(1);
+	}
+#endif
+
+	initGL();
+	loadPlanet();
+
+#ifdef EMSCRIPTEN
+	emscripten_set_main_loop(mainloop, 0, 1);
+#else
+	while (!quit) mainloop();
+#endif
+
+	SDL_Quit();
 	
 	return 0;
 }

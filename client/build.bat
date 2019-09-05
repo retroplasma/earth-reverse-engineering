@@ -6,7 +6,8 @@ set TARGET=main
 
 set SDL2_INCLUDE=/I "C:\lib\SDL2-2.0.8\include"
 set PROTOBUF_INCLUDE=/I "C:\lib\protobuf-3.9.1\src"
-set INCLUDE_DIRS=%SDL2_INCLUDE% %PROTOBUF_INCLUDE%
+set GLAD_INCLUDE=/I "gl2\include"
+set INCLUDE_DIRS=%SDL2_INCLUDE% %PROTOBUF_INCLUDE% %GLAD_INCLUDE%
 
 set LIB_SDL2=/LIBPATH:"C:\lib\SDL2-2.0.8\lib\x64" SDL2.lib SDL2main.lib
 set LIB_PROTOBUF=/LIBPATH:"C:\lib\protobuf-3.9.1\cmake\build\x64\MinSizeRel" libprotobuf.lib
