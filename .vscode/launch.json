@@ -32,6 +32,13 @@
 			"args": ["20", "2"] // "20527061605273514", "20"
 		},
 		{
+			"type": "node",
+			"request": "launch",
+			"name": "Center Obj",
+			"program": "${workspaceFolder}/center_scale_obj.js",
+			"args": ["20", "2"]
+		},
+		{
 			"type":"cppdbg",
 			"request": "launch",
 			"name": "C Debug",

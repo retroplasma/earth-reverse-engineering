@@ -78,7 +78,7 @@ void MatrixTranslation(vec3_t t, mat4_t out) {
 void MatrixScale(vec3_t s, mat4_t out) {
 	out[0] = s[0]; out[1] = 0.0f; out[2] = 0.0f; out[3] = 0.0f;
 	out[4] = 0.0f; out[5] = s[1]; out[6] = 0.0f; out[7] = 0.0f;
-	out[8] = 0.0f; out[9] = 0.0f; out[10] = s[3]; out[11] = 0.0f;
+	out[8] = 0.0f; out[9] = 0.0f; out[10] = s[2]; out[11] = 0.0f;
 	out[12] = 0.0f; out[13] = 0.0f; out[14] = 0.0f; out[15] = 1.0f;
 }
 
@@ -118,7 +118,7 @@ void MatrixMultiply(mat4_t a, mat4_t b, mat4_t out) {
 }
 
 void MatrixMultiplyPosition(mat4_t m, vec3_t v, vec3_t out) {
-	out[0] = m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3];
-	out[1] = m[4] * v[0] + m[5] * v[1] + m[6] * v[2] + m[7];
-	out[2] = m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11];
+	out[0] = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12];
+	out[1] = m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13];
+	out[2] = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14];
 }
