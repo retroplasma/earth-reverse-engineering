@@ -168,21 +168,41 @@ int unpackInt(std::string packed, int* index) {
 int unpackIndices(std::string packed, unsigned short** indices) {
 	int i = 0;
 	int e = unpackInt(packed, &i);
-	*indices = new unsigned short[e];
-	for (int k = 0, g = 0, m, p = 0, v = 0, z = 0; z < e; z++) {
+	int g = 0; // numNonDegenerateTriangles
+	unsigned short* buffer = new unsigned short[e];
+	for (int k = 0, m, p = 0, v = 0, z = 0; z < e; z++) {
 		int B = unpackInt(packed, &i);
 		m = p;
 		p = v;
 		v = k - B;
-		(*indices)[z] = v;
+		buffer[z] = v;
 		m != p && p != v && m != v && g++;
 		B || k++;
 	}
-	// g == numNonDegenerateTriangles
 
-	// TODO: make buffer of nondegenerates
+	// TODO: move to single loop
+	int indices_len = 3 * g;
+	*indices = new unsigned short[indices_len];
+	indices_len = 0;
+	for (int i = 0; i < e - 2; i++) {
+		int a = buffer[i + 0];
+		int b = buffer[i + 1];
+		int c = buffer[i + 2];
+		if (a == b || a == c || b == c) continue;
+		if (i & 1) { // reverse winding
+			(*indices)[indices_len++] = a;
+			(*indices)[indices_len++] = c;
+			(*indices)[indices_len++] = b;
+		} else {
+			(*indices)[indices_len++] = a;
+			(*indices)[indices_len++] = b;
+			(*indices)[indices_len++] = c;
+		}
+	}
 
-	return e;
+	delete [] buffer;
+
+	return indices_len;
 }
 
 // from minified js (only positions)
@@ -205,12 +225,13 @@ int unpackVertices(std::string packed, unsigned char** vertices) {
 // from minified js
 void unpackTexCoords(std::string packed, unsigned char* vertices, int vertices_len) {
 	int h = vertices_len / 8;
-
 	int i = 0;
 	int k = (unsigned char)packed[i++];
 	k += (unsigned char)packed[i++] << 8; // 65535
 	int g = (unsigned char)packed[i++];
 	g += (unsigned char)packed[i++] << 8; // 65535
+	assert(k == (1 << 16) - 1);
+	assert(g == (1 << 16) - 1);
 	int m = 0, p = 0;
 	for (int B = 0; B < h; B++) {
 		m = (m + ((unsigned char)packed[i + 0 * h + B] + 
@@ -233,7 +254,8 @@ struct PlanetMesh {
 	GLuint texture;
 	float uv_offset[2];
 	float uv_scale[2];
-} planet_meshes[8];
+} planet_meshes[64];
+int planet_mesh_count = 0;
 float planet_radius;
 //vec3_t planet_min;
 //vec3_t planet_max;
@@ -246,7 +268,6 @@ void loadPlanet() {
 	int root_epoch = planetoid->root_node_metadata().epoch();
 	BulkMetadata* root_bulk = getBulk("", root_epoch);
 
-	int node_count = 0;
 	for (auto node_meta : root_bulk->node_metadata()) {
 		char path[MAX_LEVEL+1];
 		int level, flags;
@@ -261,7 +282,7 @@ void loadPlanet() {
 			}
 			NodeData* node = getNode(path, root_epoch, Texture_Format_DXT1, imagery_epoch);
 			if (node) {
-				PlanetMesh* planet_mesh = &planet_meshes[node_count];
+				PlanetMesh* planet_mesh = &planet_meshes[planet_mesh_count++];
 				for (int i = 0; i < 16; i++) {
 					planet_mesh->transform[i] = (float)node->matrix_globe_from_mesh(i);
 				}
@@ -276,26 +297,6 @@ void loadPlanet() {
 					planet_mesh->uv_offset[1] = mesh.uv_offset_and_scale(1);
 					planet_mesh->uv_scale[0] = mesh.uv_offset_and_scale(2);
 					planet_mesh->uv_scale[1] = mesh.uv_offset_and_scale(3);
-					//d.uv_offset_and_scale && (d.uv_offset_and_scale[1] -= 1 / d.uv_offset_and_scale[3], d.uv_offset_and_scale[3] *= -1);
-					
-					// remove degenerates (TODO: move to unpackIndices)
-					unsigned short* indices2 = new unsigned short[indices_len];
-					int indices2_len = 0;
-					for (int i = 0; i < indices_len - 2; i++) {
-						int a = indices[i + 0];
-						int b = indices[i + 1];
-						int c = indices[i + 2];
-						if (a == b || a == c || b == c) continue;
-						if (i & 1) { // reverse winding
-							indices2[indices2_len++] = a;
-							indices2[indices2_len++] = c;
-							indices2[indices2_len++] = b;
-						} else {
-							indices2[indices2_len++] = a;
-							indices2[indices2_len++] = b;
-							indices2[indices2_len++] = c;
-						}
-					}
 
 #if 0
 					planet_min[0] = planet_min[1] = planet_min[2] = INFINITY;
@@ -322,11 +323,10 @@ void loadPlanet() {
 					glBufferData(GL_ARRAY_BUFFER, vertices_len * sizeof(unsigned char), vertices, GL_STATIC_DRAW);
 					glGenBuffers(1, &planet_mesh->indices_buffer);
 					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planet_mesh->indices_buffer);
-					glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices2_len * sizeof(unsigned short), indices2, GL_STATIC_DRAW);
-					planet_mesh->element_count = indices2_len;
+					glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_len * sizeof(unsigned short), indices, GL_STATIC_DRAW);
+					planet_mesh->element_count = indices_len;
 
 					delete [] indices;
-					delete [] indices2;
 					delete [] vertices;
 
 					glGenTextures(1, &planet_mesh->texture);
@@ -352,13 +352,13 @@ void loadPlanet() {
 				}
 				delete node;
 
-				node_count++;
-				if (node_count == 8) return; // stop after first 8 nodes for now
+				if (planet_mesh_count >= 64) return; // stop after a couple of nodes for now
 			}
 		}
 
 		// next level
 		if (level == 4 && !(flags & NodeMetadata_Flags_LEAF)) { // bulk
+			return; // don't
 			BulkMetadata* bulk = getBulk(path, root_epoch);
 			if (bulk != NULL) {
 				printf("metas %d\n", bulk->node_metadata().size());
@@ -463,7 +463,7 @@ void drawPlanet() {
 	glUseProgram(program);
 	glEnableVertexAttribArray(position_loc);
 	glEnableVertexAttribArray(texcoords_loc);
-	for (int mesh_index = 0; mesh_index < 8; mesh_index++) {
+	for (int mesh_index = 8; mesh_index < planet_mesh_count; mesh_index++) {
 		PlanetMesh* planet_mesh = &planet_meshes[mesh_index];
 
 		MatrixMultiply(scale, planet_mesh->transform, temp0);
