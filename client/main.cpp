@@ -489,6 +489,9 @@ void initGL() {
 	texcoords_loc = glGetAttribLocation(program, "texcoords");
 }
 
+
+float cam_lat = 0.0f;
+float cam_lon = 0.0f;
 void drawPlanet() {
 	int width, height;
 	SDL_GL_GetDrawableSize(sdl_window, &width, &height);
@@ -509,15 +512,17 @@ void drawPlanet() {
 	}
 	MatrixFrustum(-right_plane, right_plane, -top_plane, top_plane, near_plane, 10.0f, projection);
 
-	mat4_t temp0, temp1, translation, rotation, scale, modelview, transform;
+	mat4_t temp0, temp1, translation, x_rotation, y_rotation, rotation, scale, modelview, transform;
 	float s = 1.0f / planet_radius;
 	vec3_t s3 = { s, s, s };
 	MatrixScale(s3, scale);
 	vec3_t t = { 0.0f, 0.0f, -4.0f };
 	MatrixTranslation(t, translation);
-	static float angle = 0.0f; angle += 0.01f;
-	vec3_t y_axis = {1.0f, 0.0f, 0.0f};
-	MatrixRotation(y_axis, angle, rotation);
+	vec3_t x_axis = {1.0f, 0.0f, 0.0f};
+	vec3_t y_axis = {0.0f, 1.0f, 0.0f};
+	MatrixRotation(x_axis, (float)M_PI * cam_lat / 180.0f, x_rotation);
+	MatrixRotation(y_axis, (float)M_PI * cam_lon / 180.0f, y_rotation);
+	MatrixMultiply(x_rotation, y_rotation, rotation);
 
 	glUseProgram(program);
 	glEnableVertexAttribArray(position_loc);
@@ -558,6 +563,13 @@ void mainloop() {
 				break;
 			case SDL_KEYDOWN:
 				if (sdl_event.key.keysym.sym == SDLK_ESCAPE) quit = true;
+				break;
+			case SDL_MOUSEMOTION:
+				if (sdl_event.motion.state == SDL_PRESSED) {
+					cam_lon += sdl_event.motion.xrel;
+					cam_lat += sdl_event.motion.yrel;
+					cam_lat = cam_lat < -90.0f ? -90.0f : cam_lat > 90.0f ? 90.0f : cam_lat;
+				}
 				break;
 #ifdef EMSCRIPTEN // Touch controls
 			case SDL_FINGERDOWN: {
