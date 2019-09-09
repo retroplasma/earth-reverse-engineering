@@ -260,6 +260,51 @@ float planet_radius;
 //vec3_t planet_min;
 //vec3_t planet_max;
 
+void imageHalve(unsigned char* pixels, int width, int height, int comp, unsigned char* out) {
+	assert(width > 1 && height > 1);
+	int half_width  = width  / 2;
+	int half_height = height / 2;
+	for (int y = 0; y < half_height; y++) {
+		for (int x = 0; x < half_width; x++) {
+			for (int ci = 0; ci < comp; ci++) {
+				int c = (int)(pixels[comp * (width * (2 * y + 0) + (2 * x + 0)) + ci]
+							+ pixels[comp * (width * (2 * y + 0) + (2 * x + 1)) + ci]
+							+ pixels[comp * (width * (2 * y + 1) + (2 * x + 0)) + ci]
+							+ pixels[comp * (width * (2 * y + 1) + (2 * x + 1)) + ci]);
+				out[comp * (half_width * y + x) + ci] = (unsigned char)(c / 4);
+			}
+		}
+	}
+}
+
+void imageHalveHorizontally(unsigned char* pixels, int width, int height, int comp, unsigned char* out) {
+	assert(width > 1);
+	int half_width = width  / 2;
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < half_width; x++) {
+			for (int ci = 0; ci < comp; ci++) {
+				int c = (int)(pixels[comp * (width * y + 2 * x + 0) + ci]
+							+ pixels[comp * (width * y + 2 * x + 1) + ci]);
+				out[comp * (half_width * y + x) + ci] = (unsigned char)(c / 2);
+			}
+		}
+	}
+}
+
+void imageHalveVertically(unsigned char* pixels, int width, int height, int comp, unsigned char* out) {
+	assert(height > 1);
+	int half_height = height / 2;
+	for (int y = 0; y < half_height; y++) {
+		for (int x = 0; x < width; x++) {
+			for (int ci = 0; ci < comp; ci++) {
+				int c = (int)(pixels[comp * (width * (2 * y + 0) + x) + ci]
+							+ pixels[comp * (width * (2 * y + 1) + x) + ci]);
+				out[comp * (width * y + x) + ci] = (unsigned char)(c / 2);
+			}
+		}
+	}
+}
+
 void loadPlanet() {
 	PlanetoidMetadata* planetoid = getPlanetoid();
 	printf("earth radius: %f\n", planetoid->radius());
@@ -331,8 +376,7 @@ void loadPlanet() {
 
 					glGenTextures(1, &planet_mesh->texture);
 					glBindTexture(GL_TEXTURE_2D, planet_mesh->texture);
-					// TODO: mipmapping
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -341,11 +385,26 @@ void loadPlanet() {
 					if (tex.format() == Texture_Format_JPG) {
 						assert(tex.data().size() == 1); // else we have to concatenate
 						std::string data = tex.data()[0];
-						int width, height;
+						int width, height, comp;
 						unsigned char* pixels = stbi_load_from_memory((unsigned char*)&data[0],
-							data.size(), &width, &height, NULL, 0);
+							data.size(), &width, &height, &comp, 0);
 						if (pixels != NULL) {
 							glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+							unsigned char* pixels2 = new unsigned char[width * height];
+							unsigned char* pixels_in = pixels;
+							unsigned char* pixels_out = pixels2;
+							for (int mipmap_level = 1; width > 1 && height > 1; mipmap_level++) {
+								if (width > 1 && height > 1) {
+									imageHalve(pixels_in, width, height, comp, pixels_out); width /= 2; height /= 2;
+								} else if (width > 1) {
+									imageHalveHorizontally(pixels_in, width, height, comp, pixels_out); width /= 2;
+								} else if (height > 1) {
+									imageHalveVertically(pixels_in, width, height, comp, pixels_out); height /= 2;
+								}
+								glTexImage2D(GL_TEXTURE_2D, mipmap_level, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels_out);
+								unsigned char* tmp = pixels_in; pixels_in = pixels_out; pixels_out = tmp; // swap
+							}
+							delete [] pixels2;
 							stbi_image_free(pixels);
 						}
 					} else assert(false); // TODO: other formats
