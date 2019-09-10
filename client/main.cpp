@@ -411,7 +411,7 @@ void loadPlanet() {
 				}
 				delete node;
 
-				if (planet_mesh_count >= 64) return; // stop after a couple of nodes for now
+				if (planet_mesh_count >= 8) return; // stop after a couple of nodes for now
 			}
 		}
 
@@ -512,7 +512,7 @@ void drawPlanet() {
 	}
 	MatrixFrustum(-right_plane, right_plane, -top_plane, top_plane, near_plane, 10.0f, projection);
 
-	mat4_t temp0, temp1, translation, x_rotation, y_rotation, rotation, scale, modelview, transform;
+	mat4_t temp0, temp1, temp2, translation, x_rotation, y_rotation, rotation, scale, modelview, transform;
 	float s = 1.0f / planet_radius;
 	vec3_t s3 = { s, s, s };
 	MatrixScale(s3, scale);
@@ -522,12 +522,19 @@ void drawPlanet() {
 	vec3_t y_axis = {0.0f, 1.0f, 0.0f};
 	MatrixRotation(x_axis, (float)M_PI * cam_lat / 180.0f, x_rotation);
 	MatrixRotation(y_axis, (float)M_PI * cam_lon / 180.0f, y_rotation);
-	MatrixMultiply(x_rotation, y_rotation, rotation);
+	MatrixMultiply(x_rotation, y_rotation, temp0);
+	mat4_t base = {
+		0.0f, 0.0f, 1.0f, 0.0f,
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
+	};
+	MatrixMultiply(temp0, base, rotation);
 
 	glUseProgram(program);
 	glEnableVertexAttribArray(position_loc);
 	glEnableVertexAttribArray(texcoords_loc);
-	for (int mesh_index = 8; mesh_index < planet_mesh_count; mesh_index++) {
+	for (int mesh_index = 0; mesh_index < planet_mesh_count; mesh_index++) {
 		PlanetMesh* planet_mesh = &planet_meshes[mesh_index];
 
 		MatrixMultiply(scale, planet_mesh->transform, temp0);
