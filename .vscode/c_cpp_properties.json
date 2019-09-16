@@ -17,7 +17,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "C:/lib/SDL2-2.0.8/include",
-                "C:/lib/protobuf-3.9.1/src"
+                "C:/lib/protobuf-3.9.1/src",
+                "C:/lib/imgui-1.72b"
             ],
             "defines": [
                 "_DEBUG",

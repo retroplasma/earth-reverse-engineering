@@ -13,6 +13,15 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "imgui.h"
+#include "examples/imgui_impl_sdl.h"
+#include "examples/imgui_impl_opengl2.h"
+#include "imgui.cpp"
+#include "imgui_widgets.cpp"
+#include "imgui_draw.cpp"
+#include "examples/imgui_impl_sdl.cpp"
+#include "examples/imgui_impl_opengl2.cpp"
+
 #include "proto/rocktree.pb.h"
 #include "proto/rocktree.pb.cc"
 using namespace geo_globetrotter_proto_rocktree;
@@ -525,12 +534,17 @@ void drawPlanet() {
 		}
 	}
 
+	ImGui::Text("%.2f %.2f %.2f", cam_rot[0], cam_rot[4], cam_rot[8]);
+	ImGui::Text("%.2f %.2f %.2f", cam_rot[1], cam_rot[5], cam_rot[9]);
+	ImGui::Text("%.2f %.2f %.2f", cam_rot[2], cam_rot[6], cam_rot[10]);
+
 	float s = 1.0f / planet_radius;
 	vec3_t s3 = { s, s, s };
 	MatrixScale(s3, scale);
 	vec3_t t = { 0.0f, 0.0f, -4.0f };
 	MatrixTranslation(t, translation);
 	MatrixCopy(cam_rot, rotation);
+	MatrixMultiply(translation, rotation, temp1);
 
 	glUseProgram(program);
 	glEnableVertexAttribArray(position_loc);
@@ -539,7 +553,6 @@ void drawPlanet() {
 		PlanetMesh* planet_mesh = &planet_meshes[mesh_index];
 
 		MatrixMultiply(scale, planet_mesh->transform, temp0);
-		MatrixMultiply(translation, rotation, temp1);
 		MatrixMultiply(temp1, temp0, modelview);
 		MatrixMultiply(projection, modelview, transform);
 		glUniformMatrix4fv(transform_loc, 1, GL_FALSE, transform);
@@ -557,8 +570,8 @@ void drawPlanet() {
 	}
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-	SDL_GL_SwapWindow(sdl_window);
+	glDisableVertexAttribArray(position_loc);
+	glDisableVertexAttribArray(texcoords_loc);
 }
 
 void init() {
@@ -596,9 +609,21 @@ void mainloop() {
 			} break;
 #endif
 		}
+		ImGui_ImplSDL2_ProcessEvent(&sdl_event);
 	}
 
+	ImGui_ImplOpenGL2_NewFrame();
+	ImGui_ImplSDL2_NewFrame(sdl_window);
+	ImGui::NewFrame();
+
 	drawPlanet();
+
+	ImGuiIO& io = ImGui::GetIO();
+	ImGui::Render();
+	glUseProgram(0);
+	ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+
+	SDL_GL_SwapWindow(sdl_window);
 }
 
 int main(int argc, char* argv[]) {
@@ -645,6 +670,14 @@ int main(int argc, char* argv[]) {
 	}
 #endif
 
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGui::StyleColorsLight();
+
+	ImGui_ImplSDL2_InitForOpenGL(sdl_window, gl_context);
+	ImGui_ImplOpenGL2_Init();
+
 	initGL();
 	loadPlanet();
 	init();
@@ -655,6 +688,12 @@ int main(int argc, char* argv[]) {
 	while (!quit) mainloop();
 #endif
 
+	ImGui_ImplOpenGL2_Shutdown();
+	ImGui_ImplSDL2_Shutdown();
+	ImGui::DestroyContext();
+
+	SDL_GL_DeleteContext(gl_context);
+	SDL_DestroyWindow(sdl_window);
 	SDL_Quit();
 	
 	return 0;

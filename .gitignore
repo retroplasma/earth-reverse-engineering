@@ -71,3 +71,4 @@ client/main
 *.dSYM
 *.pb.h
 *.pb.cc
+imgui.ini
