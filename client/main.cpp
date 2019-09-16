@@ -515,6 +515,18 @@ void initGL() {
 	texcoords_loc = glGetAttribLocation(program, "texcoords");
 }
 
+bool intersectRaySphere(vec3_t ro, vec3_t rd, vec3_t s, float r, float* t) {
+	vec3_t m;
+	VectorSubtract(ro, s, m);
+	float b = DotProduct(m, rd);
+	float c = DotProduct(m, m) - r * r;
+	if (c > 0.0f && b > 0.0f) return false;
+	float discr = b * b - c;
+	if (discr < 0.0f) return false;
+	*t = -b - sqrtf(discr);
+	return true;
+}
+
 mat4_t cam_rot = {
 	0.0f, 0.0f, 1.0f, 0.0f,
 	1.0f, 0.0f, 0.0f, 0.0f,
@@ -523,6 +535,7 @@ mat4_t cam_rot = {
 };
 float cam_lat = 0.0f;
 float cam_lon = 0.0f;
+float cam_zoom = 0.0f;
 int mouse_x = 0, mouse_y = 0;
 int prev_mouse_x, prev_mouse_y;
 void drawPlanet() {
@@ -537,7 +550,7 @@ void drawPlanet() {
 	mat4_t projection;
 	float aspect_ratio = (float)width / (float)height;
 	float fov = 0.25f * (float)M_PI;
-	float right_plane, top_plane, near_plane = 0.1f;
+	float right_plane, top_plane, near_plane = 0.01f;
 	if (aspect_ratio > 1.0f) {
 		right_plane = tanf(0.5f * fov) * near_plane;
 		top_plane = right_plane / aspect_ratio;
@@ -547,24 +560,39 @@ void drawPlanet() {
 	}
 	MatrixFrustum(-right_plane, right_plane, -top_plane, top_plane, near_plane, 10.0f, projection);
 
+	vec3_t t = { 0.0f, 0.0f, 0.0f };
+	t[2] = -(1.0f + near_plane + powf(1.337f, 5.0f - cam_zoom));
+
 	prev_mouse_x = mouse_x; prev_mouse_y = mouse_y;
 	unsigned mouse_buttons = SDL_GetMouseState(&mouse_x, &mouse_y);
 	SDL_GetWindowSize(sdl_window, &width, &height);
-	if (mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT) && (mouse_x != prev_mouse_x || mouse_y != prev_mouse_y)) {
+
+	if (mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT) && 
+		(mouse_x != prev_mouse_x || mouse_y != prev_mouse_y)) {
 		vec3_t w0, w1;
-		w0[0] = 4.0f * (2.0f * prev_mouse_x / width - 1.0f) * right_plane / near_plane;
-		w0[1] = 4.0f * (1.0f - 2.0f * prev_mouse_y / height) * top_plane / near_plane;
-		float xxyy0 = 1.0f - (w0[0] * w0[0] + w0[1] * w0[1]);
-		w0[2] = sqrtf(xxyy0);
-		w1[0] = 4.0f * (2.0f * mouse_x / width - 1.0f) * right_plane / near_plane;
-		w1[1] = 4.0f * (1.0f - 2.0f * mouse_y / height) * top_plane / near_plane;
-		float xxyy1 = 1.0f - (w1[0] * w1[0] + w1[1] * w1[1]);
-		w1[2] = sqrtf(xxyy1);
-		if (xxyy0 >= 0.0f && xxyy1 >= 0.0f) {
+		w0[0] = (2.0f * prev_mouse_x / width - 1.0f) * right_plane / near_plane;
+		w0[1] = (1.0f - 2.0f * prev_mouse_y / height) * top_plane / near_plane;
+		w0[2] = -1.0f;
+		VectorNormalize(w0);
+		w1[0] = (2.0f * mouse_x / width - 1.0f) * right_plane / near_plane;
+		w1[1] = (1.0f - 2.0f * mouse_y / height) * top_plane / near_plane;
+		w1[2] = -1.0f;
+		VectorNormalize(w1);
+		vec3_t origin = { 0.0f, 0.0f, 0.0f };
+		float t0, t1;
+		if (intersectRaySphere(origin, w0, t, 1.0f, &t0) && 
+			intersectRaySphere(origin, w1, t, 1.0f, &t1)) {
+			VectorScale(w0, t0, w0);
+			VectorSubtract(w0, t, w0);
+			VectorScale(w1, t1, w1);
+			VectorSubtract(w1, t, w1);
+
 			vec3_t axis;
 			CrossProduct(w0, w1, axis);
 			VectorNormalize(axis);
-			float angle = acosf(DotProduct(w0, w1));
+			float dot = DotProduct(w0, w1);
+			if (dot > 1.0f) dot = 1.0f;
+			float angle = acosf(dot);
 			MatrixRotation(axis, angle, temp0);
 			MatrixCopy(cam_rot, temp1);
 			MatrixMultiply(temp0, temp1, cam_rot);
@@ -586,7 +614,6 @@ void drawPlanet() {
 	float s = 1.0f / planet_radius;
 	vec3_t s3 = { s, s, s };
 	MatrixScale(s3, scale);
-	vec3_t t = { 0.0f, 0.0f, -4.0f };
 	MatrixTranslation(t, translation);
 	MatrixCopy(cam_rot, rotation);
 	MatrixMultiply(translation, rotation, temp1);
@@ -670,6 +697,13 @@ void mainloop() {
 				break;
 			case SDL_KEYDOWN:
 				if (sdl_event.key.keysym.sym == SDLK_ESCAPE) quit = true;
+				break;
+			case SDL_MOUSEWHEEL:
+				if (sdl_event.wheel.y > 0) {
+					if (cam_zoom < 20.0f) cam_zoom += 1.0f;
+				} else if (sdl_event.wheel.y < 0) {
+					if (cam_zoom > 0.0f) cam_zoom -= 1.0f;
+				}
 				break;
 #ifdef EMSCRIPTEN // Touch controls
 			case SDL_FINGERDOWN: {
