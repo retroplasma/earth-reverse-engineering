@@ -1,4 +1,5 @@
 #include <fstream>
+#include <sys/stat.h>
 #include <SDL.h>
 #if defined(_WIN32) || defined(__linux__)
 	#include <glad/glad.h>
@@ -113,52 +114,78 @@ bool fetchData(const char* path, unsigned char** data, size_t* len) {
 	return true;
 }
 
+bool readFile(const char* file_path, unsigned char** data, size_t* len) {
+	FILE* file = fopen(file_path, "rb");
+	if (!file) return false;
+	fseek(file, 0, SEEK_END);
+	*len = ftell(file);
+	*data = (unsigned char*)malloc(*len);
+	fseek(file, 0, SEEK_SET);
+	fread(*data, *len, 1, file);
+	fclose(file);
+	return true;
+}
+
+void writeFile(const char* file_path, unsigned char* data, size_t len) {
+	FILE* file = fopen(file_path, "wb");
+	if (!file) return;
+	fwrite(data, len, 1, file);
+	fclose(file);
+}
+
 PlanetoidMetadata* getPlanetoid() {
 	unsigned char* data; size_t len;
-	if (fetchData("PlanetoidMetadata", &data, &len)) {
-		PlanetoidMetadata* planetoid = new PlanetoidMetadata();
-		if (planetoid->ParseFromArray(data, len)) {
-			free(data);
-			return planetoid;
-		} else {
-			free(data);
-			delete planetoid;
-		}
+	if (!fetchData("PlanetoidMetadata", &data, &len)) return NULL;
+
+	PlanetoidMetadata* planetoid = new PlanetoidMetadata();
+	if (planetoid->ParseFromArray(data, len)) {
+		free(data);
+		return planetoid;
 	}
+	free(data);
+	delete planetoid;
 	return NULL;
 }
 
 BulkMetadata* getBulk(const char* path, int epoch) {
-	char url_buf[200];
-	sprintf(url_buf, "BulkMetadata/pb=!1m2!1s%s!2u%d", path, epoch);
-	unsigned char* data; size_t len;
-	if (fetchData(url_buf, &data, &len)) {
-		BulkMetadata* bulk = new BulkMetadata();
-		if (bulk->ParseFromArray(data, len)) {
-			free(data);
-			return bulk;
-		} else {
-			free(data);
-			delete bulk;
-		}
+	char path_buf[200];
+	sprintf(path_buf, "cache/bulk_%s_%d.bin", path, epoch);
+	unsigned char* data = NULL; size_t len;
+	if (!readFile(path_buf, &data, &len)) {
+		char url_buf[200];
+		sprintf(url_buf, "BulkMetadata/pb=!1m2!1s%s!2u%d", path, epoch);
+		if (!fetchData(url_buf, &data, &len)) return NULL;
+		writeFile(path_buf, data, len);
 	}
+
+	BulkMetadata* bulk = new BulkMetadata();
+	if (bulk->ParseFromArray(data, len)) {
+		free(data);
+		return bulk;
+	}
+	free(data);
+	delete bulk;
 	return NULL;
 }
 
 NodeData* getNode(const char* path, int epoch, int texture_format, int imagery_epoch) {
-	char url_buf[200];
-	sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!3u%d!4b0", path, epoch, texture_format, imagery_epoch);
+	char path_buf[200];
+	sprintf(path_buf, "cache/node_%s_%d_%d_%d.bin", path, epoch, texture_format, imagery_epoch);
 	unsigned char* data; size_t len;
-	if (fetchData(url_buf, &data, &len)) {
-		NodeData* node = new NodeData();
-		if (node->ParseFromArray(data, len)) {
-			free(data);
-			return node;
-		} else {
-			free(data);
-			delete node;
-		}
+	if (!readFile(path_buf, &data, &len)) {
+		char url_buf[200];
+		sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!3u%d!4b0", path, epoch, texture_format, imagery_epoch);
+		if (!fetchData(url_buf, &data, &len)) return NULL;
+		writeFile(path_buf, data, len);
 	}
+
+	NodeData* node = new NodeData();
+	if (node->ParseFromArray(data, len)) {
+		free(data);
+		return node;
+	}
+	free(data);
+	delete node;
 	return NULL;
 }
 
@@ -266,8 +293,11 @@ struct PlanetMesh {
 } planet_meshes[64];
 int planet_mesh_count = 0;
 float planet_radius;
-//vec3_t planet_min;
-//vec3_t planet_max;
+
+struct OctreeNode {
+	OctreeNode* children[8];
+	PlanetMesh* mesh;
+};
 
 void imageHalve(unsigned char* pixels, int width, int height, int comp, unsigned char* out) {
 	assert(width > 1 && height > 1);
@@ -315,6 +345,13 @@ void imageHalveVertically(unsigned char* pixels, int width, int height, int comp
 }
 
 void loadPlanet() {
+	// create cache directory
+#ifdef _WIN32
+	_mkdir("cache");
+#else
+	mkdir("cache", (mode_t)0755);
+#endif
+
 	PlanetoidMetadata* planetoid = getPlanetoid();
 	printf("earth radius: %f\n", planetoid->radius());
 	planet_radius = planetoid->radius();
@@ -337,9 +374,7 @@ void loadPlanet() {
 			NodeData* node = getNode(path, root_epoch, Texture_Format_DXT1, imagery_epoch);
 			if (node) {
 				PlanetMesh* planet_mesh = &planet_meshes[planet_mesh_count++];
-				for (int i = 0; i < 16; i++) {
-					planet_mesh->transform[i] = (float)node->matrix_globe_from_mesh(i);
-				}
+				for (int i = 0; i < 16; i++) planet_mesh->transform[i] = (float)node->matrix_globe_from_mesh(i);
 				for (auto mesh : node->meshes()) {
 					unsigned short* indices;
 					unsigned char* vertices;
@@ -400,7 +435,9 @@ void loadPlanet() {
 				}
 				delete node;
 
-				if (planet_mesh_count >= 8) return; // stop after a couple of nodes for now
+				if (planet_mesh_count >= 64) return; // stop after a couple of nodes for now
+			} else { // node == NULL
+				assert(false);
 			}
 		}
 
@@ -557,7 +594,7 @@ void drawPlanet() {
 	glUseProgram(program);
 	glEnableVertexAttribArray(position_loc);
 	glEnableVertexAttribArray(texcoords_loc);
-	for (int mesh_index = 0; mesh_index < planet_mesh_count; mesh_index++) {
+	for (int mesh_index = 8; mesh_index < planet_mesh_count; mesh_index++) {
 		PlanetMesh* planet_mesh = &planet_meshes[mesh_index];
 
 		MatrixMultiply(scale, planet_mesh->transform, temp0);

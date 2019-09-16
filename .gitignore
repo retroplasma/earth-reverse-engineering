@@ -72,3 +72,4 @@ client/main
 *.pb.h
 *.pb.cc
 imgui.ini
+client/cache
