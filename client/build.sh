@@ -1,5 +1,5 @@
 #!/bin/sh
-CFLAGS="--std=c++11 -g -I. `pkg-config --cflags sdl2 protobuf`"
+CFLAGS="--std=c++11 -g -I. `pkg-config --cflags sdl2 protobuf` -I$HOME/lib/imgui-1.72b"
 LDFLAGS="`pkg-config --libs sdl2 protobuf`"
 if [ `uname` = "Darwin" ]; then
 	LDFLAGS="$LDFLAGS -framework OpenGL"

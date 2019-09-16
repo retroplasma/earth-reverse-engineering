@@ -13,6 +13,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include "proto/rocktree.pb.h"
+#include "proto/rocktree.pb.cc"
+using namespace geo_globetrotter_proto_rocktree;
+
 #include "imgui.h"
 #include "examples/imgui_impl_sdl.h"
 #include "examples/imgui_impl_opengl2.h"
@@ -21,10 +25,6 @@
 #include "imgui_draw.cpp"
 #include "examples/imgui_impl_sdl.cpp"
 #include "examples/imgui_impl_opengl2.cpp"
-
-#include "proto/rocktree.pb.h"
-#include "proto/rocktree.pb.cc"
-using namespace geo_globetrotter_proto_rocktree;
 
 #include "vector_math.h"
 
