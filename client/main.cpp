@@ -484,8 +484,8 @@ mat4_t cam_rot = {
 	0.0f, 1.0f, 0.0f, 0.0f,
 	0.0f, 0.0f, 0.0f, 1.0f,
 };
-//float cam_lat = 0.0f;
-//float cam_lon = 0.0f;
+float cam_lat = 0.0f;
+float cam_lon = 0.0f;
 int mouse_x = 0, mouse_y = 0;
 int prev_mouse_x, prev_mouse_y;
 void drawPlanet() {
@@ -537,6 +537,14 @@ void drawPlanet() {
 	ImGui::Text("%.2f %.2f %.2f", cam_rot[0], cam_rot[4], cam_rot[8]);
 	ImGui::Text("%.2f %.2f %.2f", cam_rot[1], cam_rot[5], cam_rot[9]);
 	ImGui::Text("%.2f %.2f %.2f", cam_rot[2], cam_rot[6], cam_rot[10]);
+	vec3_t pos = { 0.0f, 0.0f, 1.0f }, out;
+	mat4_t inv_cam_rot;
+	MatrixCopy(cam_rot, inv_cam_rot);
+	MatrixTranspose(inv_cam_rot);
+	MatrixMultiplyPosition(inv_cam_rot, pos, out);
+	cam_lat = asinf(out[2]);
+	cam_lon = atan2f(out[1], out[0]);
+	ImGui::Text("%.2f %.2f", cam_lat * 180.0f / M_PI, cam_lon * 180.0f / M_PI);
 
 	float s = 1.0f / planet_radius;
 	vec3_t s3 = { s, s, s };
@@ -572,6 +580,30 @@ void drawPlanet() {
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glDisableVertexAttribArray(position_loc);
 	glDisableVertexAttribArray(texcoords_loc);
+	glUseProgram(0);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadMatrixf(projection);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadMatrixf(temp1);
+	glDisable(GL_DEPTH_TEST);
+	glBegin(GL_LINES);
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glVertex3f(0.0f, 0.0f, 0.0f);
+	glVertex3f(1.0f, 0.0f, 0.0f);
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glVertex3f(0.0f, 0.0f, 0.0f);
+	glVertex3f(0.0f, 1.0f, 0.0f);
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glVertex3f(0.0f, 0.0f, 0.0f);
+	glVertex3f(0.0f, 0.0f, 1.0f);
+	glEnd();
+	glPointSize(5.0f);
+	glBegin(GL_POINTS);
+	glColor3f(1.0f, 0.0f, 1.0f);
+	glVertex3f(out[0], out[1], out[2]);
+	glEnd();
+	glEnable(GL_DEPTH_TEST);
 }
 
 void init() {
@@ -627,8 +659,8 @@ void mainloop() {
 }
 
 int main(int argc, char* argv[]) {
-	int video_width = 512;
-	int video_height = 512;
+	int video_width = 768;
+	int video_height = 768;
 
 	if (SDL_Init(SDL_INIT_VIDEO) != 0) {
 		fprintf(stderr, "Couldn't init SDL2: %s\n", SDL_GetError());
