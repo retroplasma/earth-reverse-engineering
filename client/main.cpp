@@ -343,26 +343,6 @@ void loadPlanet() {
 					planet_mesh->uv_scale[0] = mesh.uv_offset_and_scale(2);
 					planet_mesh->uv_scale[1] = mesh.uv_offset_and_scale(3);
 
-#if 0
-					planet_min[0] = planet_min[1] = planet_min[2] = INFINITY;
-					planet_max[0] = planet_max[1] = planet_max[2] =-INFINITY;
-					for (int i = 0; i < vertices_len; i += 8) {
-						vec3_t v = {
-							(float)vertices[i + 0],
-							(float)vertices[i + 1],
-							(float)vertices[i + 2]
-						};
-						vec3_t o;
-						MatrixMultiplyPosition(planet_mesh->transform, v, o);
-						planet_min[0] = fminf(planet_min[0], o[0]);
-						planet_min[1] = fminf(planet_min[1], o[1]);
-						planet_min[2] = fminf(planet_min[2], o[2]);
-						planet_max[0] = fmaxf(planet_max[0], o[0]);
-						planet_max[1] = fmaxf(planet_max[1], o[1]);
-						planet_max[2] = fmaxf(planet_max[2], o[2]);
-					}
-#endif
-
 					glGenBuffers(1, &planet_mesh->vertices_buffer);
 					glBindBuffer(GL_ARRAY_BUFFER, planet_mesh->vertices_buffer);
 					glBufferData(GL_ARRAY_BUFFER, vertices_len * sizeof(unsigned char), vertices, GL_STATIC_DRAW);
@@ -489,10 +469,19 @@ void initGL() {
 	texcoords_loc = glGetAttribLocation(program, "texcoords");
 }
 
-
-float cam_lat = 0.0f;
-float cam_lon = 0.0f;
+mat4_t cam_rot = {
+	0.0f, 0.0f, 1.0f, 0.0f,
+	1.0f, 0.0f, 0.0f, 0.0f,
+	0.0f, 1.0f, 0.0f, 0.0f,
+	0.0f, 0.0f, 0.0f, 1.0f,
+};
+//float cam_lat = 0.0f;
+//float cam_lon = 0.0f;
+int mouse_x = 0, mouse_y = 0;
+int prev_mouse_x, prev_mouse_y;
 void drawPlanet() {
+	mat4_t temp0, temp1, temp2, translation, rotation, scale, modelview, transform;
+
 	int width, height;
 	SDL_GL_GetDrawableSize(sdl_window, &width, &height);
 	glViewport(0, 0, width, height);
@@ -512,24 +501,36 @@ void drawPlanet() {
 	}
 	MatrixFrustum(-right_plane, right_plane, -top_plane, top_plane, near_plane, 10.0f, projection);
 
-	mat4_t temp0, temp1, temp2, translation, x_rotation, y_rotation, rotation, scale, modelview, transform;
+	prev_mouse_x = mouse_x; prev_mouse_y = mouse_y;
+	unsigned mouse_buttons = SDL_GetMouseState(&mouse_x, &mouse_y);
+	SDL_GetWindowSize(sdl_window, &width, &height);
+	if (mouse_buttons & SDL_BUTTON(SDL_BUTTON_LEFT) && (mouse_x != prev_mouse_x || mouse_y != prev_mouse_y)) {
+		vec3_t w0, w1;
+		w0[0] = 4.0f * (2.0f * prev_mouse_x / width - 1.0f) * right_plane / near_plane;
+		w0[1] = 4.0f * (1.0f - 2.0f * prev_mouse_y / height) * top_plane / near_plane;
+		float xxyy0 = 1.0f - (w0[0] * w0[0] + w0[1] * w0[1]);
+		w0[2] = sqrtf(xxyy0);
+		w1[0] = 4.0f * (2.0f * mouse_x / width - 1.0f) * right_plane / near_plane;
+		w1[1] = 4.0f * (1.0f - 2.0f * mouse_y / height) * top_plane / near_plane;
+		float xxyy1 = 1.0f - (w1[0] * w1[0] + w1[1] * w1[1]);
+		w1[2] = sqrtf(xxyy1);
+		if (xxyy0 >= 0.0f && xxyy1 >= 0.0f) {
+			vec3_t axis;
+			CrossProduct(w0, w1, axis);
+			VectorNormalize(axis);
+			float angle = acosf(DotProduct(w0, w1));
+			MatrixRotation(axis, angle, temp0);
+			MatrixCopy(cam_rot, temp1);
+			MatrixMultiply(temp0, temp1, cam_rot);
+		}
+	}
+
 	float s = 1.0f / planet_radius;
 	vec3_t s3 = { s, s, s };
 	MatrixScale(s3, scale);
 	vec3_t t = { 0.0f, 0.0f, -4.0f };
 	MatrixTranslation(t, translation);
-	vec3_t x_axis = {1.0f, 0.0f, 0.0f};
-	vec3_t y_axis = {0.0f, 1.0f, 0.0f};
-	MatrixRotation(x_axis, (float)M_PI * cam_lat / 180.0f, x_rotation);
-	MatrixRotation(y_axis, (float)M_PI * cam_lon / 180.0f, y_rotation);
-	MatrixMultiply(x_rotation, y_rotation, temp0);
-	mat4_t base = {
-		0.0f, 0.0f, 1.0f, 0.0f,
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, 1.0f,
-	};
-	MatrixMultiply(temp0, base, rotation);
+	MatrixCopy(cam_rot, rotation);
 
 	glUseProgram(program);
 	glEnableVertexAttribArray(position_loc);
@@ -560,6 +561,23 @@ void drawPlanet() {
 	SDL_GL_SwapWindow(sdl_window);
 }
 
+void init() {
+#if 0
+	vec3_t x_axis = {1.0f, 0.0f, 0.0f};
+	vec3_t y_axis = {0.0f, 1.0f, 0.0f};
+	MatrixRotation(x_axis, (float)M_PI * cam_lat / 180.0f, x_rotation);
+	MatrixRotation(y_axis, (float)M_PI * cam_lon / 180.0f, y_rotation);
+	MatrixMultiply(x_rotation, y_rotation, temp0);
+	mat4_t base = {
+		0.0f, 0.0f, 1.0f, 0.0f,
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f,
+	};
+	MatrixMultiply(temp0, base, rotation);
+#endif
+}
+
 bool quit = false;
 void mainloop() {
 	SDL_Event sdl_event;
@@ -570,13 +588,6 @@ void mainloop() {
 				break;
 			case SDL_KEYDOWN:
 				if (sdl_event.key.keysym.sym == SDLK_ESCAPE) quit = true;
-				break;
-			case SDL_MOUSEMOTION:
-				if (sdl_event.motion.state == SDL_PRESSED) {
-					cam_lon += sdl_event.motion.xrel;
-					cam_lat += sdl_event.motion.yrel;
-					cam_lat = cam_lat < -90.0f ? -90.0f : cam_lat > 90.0f ? 90.0f : cam_lat;
-				}
 				break;
 #ifdef EMSCRIPTEN // Touch controls
 			case SDL_FINGERDOWN: {
@@ -636,6 +647,7 @@ int main(int argc, char* argv[]) {
 
 	initGL();
 	loadPlanet();
+	init();
 
 #ifdef EMSCRIPTEN
 	emscripten_set_main_loop(mainloop, 0, 1);
