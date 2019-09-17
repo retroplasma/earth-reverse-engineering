@@ -28,6 +28,7 @@ using namespace geo_globetrotter_proto_rocktree;
 #include "examples/imgui_impl_opengl2.cpp"
 
 #include "vector_math.h"
+#include "util.cpp"
 
 SDL_Window* sdl_window;
 
@@ -86,53 +87,6 @@ void getPathAndFlags(int path_id, char path[], int* level, int* flags) {
 	*flags = path_id;
 }
 
-bool fetchData(const char* path, unsigned char** data, size_t* len) {
-	const char* base_url = "http://kh.google.com/rt/earth/";
-	char* url = (char*)malloc(strlen(base_url) + strlen(path) + 1);
-	strcpy(url, base_url); strcat(url, path);
-	printf("GET %s\n", url);
-	http_t* request = http_get(url, NULL); 
-	free(url);
-	if (!request) return false;
-	
-	http_status_t status;
-	do {
-		status = http_process(request);
-		SDL_Delay(1);
-	} while (status == HTTP_STATUS_PENDING);
-
-	if (status == HTTP_STATUS_FAILED) {
-		http_release(request);
-		return false;
-	}
-
-	*data = (unsigned char*)malloc(request->response_size);
-	*len = request->response_size;
-	memcpy(*data, request->response_data, *len);
-	
-	http_release(request);
-	return true;
-}
-
-bool readFile(const char* file_path, unsigned char** data, size_t* len) {
-	FILE* file = fopen(file_path, "rb");
-	if (!file) return false;
-	fseek(file, 0, SEEK_END);
-	*len = ftell(file);
-	*data = (unsigned char*)malloc(*len);
-	fseek(file, 0, SEEK_SET);
-	fread(*data, *len, 1, file);
-	fclose(file);
-	return true;
-}
-
-void writeFile(const char* file_path, unsigned char* data, size_t len) {
-	FILE* file = fopen(file_path, "wb");
-	if (!file) return;
-	fwrite(data, len, 1, file);
-	fclose(file);
-}
-
 PlanetoidMetadata* getPlanetoid() {
 	unsigned char* data; size_t len;
 	if (!fetchData("PlanetoidMetadata", &data, &len)) return NULL;
@@ -189,6 +143,29 @@ NodeData* getNode(const char* path, int epoch, int texture_format, int imagery_e
 	return NULL;
 }
 
+struct OrientedBoundingBox {
+	vec3_t center;
+	vec3_t extents;
+	mat4_t orientation;
+};
+
+struct PlanetMesh {
+	mat4_t transform;
+	GLuint vertices_buffer;
+	GLuint indices_buffer;
+	int element_count;
+	GLuint texture;
+	float uv_offset[2];
+	float uv_scale[2];
+
+	OrientedBoundingBox obb;
+	double lla_min[3]; // longitude, latitude, altitude
+	double lla_max[3];
+	int level;
+} planet_meshes[128];
+int planet_mesh_count = 0;
+float planet_radius;
+
 int unpackInt(std::string packed, int* index) {
 	int c = 0, d = 1;
 	int e;
@@ -200,45 +177,48 @@ int unpackInt(std::string packed, int* index) {
 	return c;
 }
 
-// from minified js
-int unpackIndices(std::string packed, unsigned short** indices) {
+short unpackShort(std::string packed, int* index) {
+	unsigned c = (unsigned)packed[(*index)++];
+	c |= (unsigned)packed[(*index)++] << 8;
+	//return c & 32768 ? c | 4294901760 : c; // to signed short
+	return (short)c;
+}
+
+unsigned short unpackUnsignedShort(std::string packed, int* index) {
+	unsigned c = (unsigned)packed[(*index)++];
+	c |= (unsigned)packed[(*index)++] << 8;
+	return (unsigned short)c;
+}
+
+// from decode-resource.js:407
+void unpackObb(std::string data, vec3_t head_node_center, float meters_per_texel, OrientedBoundingBox* obb) {
 	int i = 0;
-	int e = unpackInt(packed, &i);
-	int g = 0; // numNonDegenerateTriangles
-	unsigned short* buffer = new unsigned short[e];
-	for (int k = 0, m, p = 0, v = 0, z = 0; z < e; z++) {
-		int B = unpackInt(packed, &i);
-		m = p;
-		p = v;
-		v = k - B;
-		buffer[z] = v;
-		m != p && p != v && m != v && g++;
-		B || k++;
-	}
-
-	// TODO: move to single loop
-	int indices_len = 3 * g;
-	*indices = new unsigned short[indices_len];
-	indices_len = 0;
-	for (int i = 0; i < e - 2; i++) {
-		int a = buffer[i + 0];
-		int b = buffer[i + 1];
-		int c = buffer[i + 2];
-		if (a == b || a == c || b == c) continue;
-		if (i & 1) { // reverse winding
-			(*indices)[indices_len++] = a;
-			(*indices)[indices_len++] = c;
-			(*indices)[indices_len++] = b;
-		} else {
-			(*indices)[indices_len++] = a;
-			(*indices)[indices_len++] = b;
-			(*indices)[indices_len++] = c;
-		}
-	}
-
-	delete [] buffer;
-
-	return indices_len;
+	obb->center[0] = unpackShort(data, &i) * meters_per_texel + head_node_center[0];
+	obb->center[1] = unpackShort(data, &i) * meters_per_texel + head_node_center[1];
+	obb->center[2] = unpackShort(data, &i) * meters_per_texel + head_node_center[2];
+	obb->extents[0] = (unsigned)data[i++] * meters_per_texel;
+	obb->extents[1] = (unsigned)data[i++] * meters_per_texel;
+	obb->extents[2] = (unsigned)data[i++] * meters_per_texel;
+	vec3_t euler;
+	euler[0] = unpackUnsignedShort(data, &i) * M_PI / 32768.0f;
+	euler[1] = unpackUnsignedShort(data, &i) * M_PI / 65536.0f;
+	euler[2] = unpackUnsignedShort(data, &i) * M_PI / 32768.0f;
+	float c0 = cosf(euler[0]);
+	float s0 = sinf(euler[0]);
+	float c1 = cosf(euler[1]);
+	float s1 = sinf(euler[1]);
+	float c2 = cosf(euler[2]);
+	float s2 = sinf(euler[2]);
+	obb->orientation[0] = c0 * c2 - c1 * s0 * s2;
+	obb->orientation[1] = c1 * c0 * s2 + c2 * s0;
+	obb->orientation[2] = s2 * s1;
+	obb->orientation[4] = -c0 * s2 - c2 * c1 * s0;
+	obb->orientation[5] = c0 * c1 * c2 - s0 * s2;
+	obb->orientation[6] = c2 * s1;
+	obb->orientation[8] = s1 * s0;
+	obb->orientation[9] = -c0 * s1;
+	obb->orientation[10] = c1;
+	MatrixTranspose(obb->orientation); // from js
 }
 
 // from minified js (only positions)
@@ -282,76 +262,48 @@ void unpackTexCoords(std::string packed, unsigned char* vertices, int vertices_l
 	}
 }
 
-struct PlanetMesh {
-	mat4_t transform;
-	GLuint vertices_buffer;
-	GLuint indices_buffer;
-	int element_count;
-	GLuint texture;
-	float uv_offset[2];
-	float uv_scale[2];
-} planet_meshes[64];
-int planet_mesh_count = 0;
-float planet_radius;
+// from minified js
+int unpackIndices(std::string packed, unsigned short** indices) {
+	int i = 0;
+	int e = unpackInt(packed, &i);
+	int g = 0; // numNonDegenerateTriangles
+	unsigned short* buffer = new unsigned short[e];
+	for (int k = 0, m, p = 0, v = 0, z = 0; z < e; z++) {
+		int B = unpackInt(packed, &i);
+		m = p;
+		p = v;
+		v = k - B;
+		buffer[z] = v;
+		m != p && p != v && m != v && g++;
+		B || k++;
+	}
 
-struct OctreeNode {
-	OctreeNode* children[8];
-	PlanetMesh* mesh;
-};
-
-void imageHalve(unsigned char* pixels, int width, int height, int comp, unsigned char* out) {
-	assert(width > 1 && height > 1);
-	int half_width  = width  / 2;
-	int half_height = height / 2;
-	for (int y = 0; y < half_height; y++) {
-		for (int x = 0; x < half_width; x++) {
-			for (int ci = 0; ci < comp; ci++) {
-				int c = (int)(pixels[comp * (width * (2 * y + 0) + (2 * x + 0)) + ci]
-							+ pixels[comp * (width * (2 * y + 0) + (2 * x + 1)) + ci]
-							+ pixels[comp * (width * (2 * y + 1) + (2 * x + 0)) + ci]
-							+ pixels[comp * (width * (2 * y + 1) + (2 * x + 1)) + ci]);
-				out[comp * (half_width * y + x) + ci] = (unsigned char)(c / 4);
-			}
+	// TODO: move to single loop
+	int indices_len = 3 * g;
+	*indices = new unsigned short[indices_len];
+	indices_len = 0;
+	for (int i = 0; i < e - 2; i++) {
+		int a = buffer[i + 0];
+		int b = buffer[i + 1];
+		int c = buffer[i + 2];
+		if (a == b || a == c || b == c) continue;
+		if (i & 1) { // reverse winding
+			(*indices)[indices_len++] = a;
+			(*indices)[indices_len++] = c;
+			(*indices)[indices_len++] = b;
+		} else {
+			(*indices)[indices_len++] = a;
+			(*indices)[indices_len++] = b;
+			(*indices)[indices_len++] = c;
 		}
 	}
-}
 
-void imageHalveHorizontally(unsigned char* pixels, int width, int height, int comp, unsigned char* out) {
-	assert(width > 1);
-	int half_width = width  / 2;
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < half_width; x++) {
-			for (int ci = 0; ci < comp; ci++) {
-				int c = (int)(pixels[comp * (width * y + 2 * x + 0) + ci]
-							+ pixels[comp * (width * y + 2 * x + 1) + ci]);
-				out[comp * (half_width * y + x) + ci] = (unsigned char)(c / 2);
-			}
-		}
-	}
-}
+	delete [] buffer;
 
-void imageHalveVertically(unsigned char* pixels, int width, int height, int comp, unsigned char* out) {
-	assert(height > 1);
-	int half_height = height / 2;
-	for (int y = 0; y < half_height; y++) {
-		for (int x = 0; x < width; x++) {
-			for (int ci = 0; ci < comp; ci++) {
-				int c = (int)(pixels[comp * (width * (2 * y + 0) + x) + ci]
-							+ pixels[comp * (width * (2 * y + 1) + x) + ci]);
-				out[comp * (width * y + x) + ci] = (unsigned char)(c / 2);
-			}
-		}
-	}
+	return indices_len;
 }
 
 void loadPlanet() {
-	// create cache directory
-#ifdef _WIN32
-	_mkdir("cache");
-#else
-	mkdir("cache", (mode_t)0755);
-#endif
-
 	PlanetoidMetadata* planetoid = getPlanetoid();
 	printf("earth radius: %f\n", planetoid->radius());
 	planet_radius = planetoid->radius();
@@ -359,12 +311,18 @@ void loadPlanet() {
 	int root_epoch = planetoid->root_node_metadata().epoch();
 	BulkMetadata* root_bulk = getBulk("", root_epoch);
 
+	vec3_t head_node_center;
+	for (int i = 0; i < 3; i++) head_node_center[i] = root_bulk->head_node_center()[i];
+
+	printf("%d metas\n", root_bulk->node_metadata().size());
 	for (auto node_meta : root_bulk->node_metadata()) {
 		char path[MAX_LEVEL+1];
 		int level, flags;
 		getPathAndFlags(node_meta.path_and_flags(), path, &level, &flags);
 		path[level] = '\0';
-		printf("path %.*s flag %d\n", level, path, flags);
+		float meters_per_texel = root_bulk->meters_per_texel(level - 1);
+
+		if (node_meta.meters_per_texel() != 0) meters_per_texel = node_meta.meters_per_texel();
 
 		if (!(flags & NodeMetadata_Flags_NODATA)) {
 			int imagery_epoch = node_meta.imagery_epoch();
@@ -374,7 +332,23 @@ void loadPlanet() {
 			NodeData* node = getNode(path, root_epoch, Texture_Format_DXT1, imagery_epoch);
 			if (node) {
 				PlanetMesh* planet_mesh = &planet_meshes[planet_mesh_count++];
+
+				planet_mesh->level = level;
+
+				for (int i = 0; i < 3; i++) {
+					planet_mesh->lla_min[i] = node->kml_bounding_box()[i + 0];
+					planet_mesh->lla_max[i] = node->kml_bounding_box()[i + 3];
+				}
+
+				printf("node %.*s %.2f to %.2f, %.2f to %.2f\n", level, path,
+					planet_mesh->lla_min[0], planet_mesh->lla_max[0],
+					planet_mesh->lla_min[1], planet_mesh->lla_max[1]);
+
+				unpackObb(node_meta.oriented_bounding_box(), head_node_center,
+					meters_per_texel, &planet_mesh->obb);
+				
 				for (int i = 0; i < 16; i++) planet_mesh->transform[i] = (float)node->matrix_globe_from_mesh(i);
+
 				for (auto mesh : node->meshes()) {
 					unsigned short* indices;
 					unsigned char* vertices;
@@ -435,15 +409,16 @@ void loadPlanet() {
 				}
 				delete node;
 
-				if (planet_mesh_count >= 64) return; // stop after a couple of nodes for now
+				if (planet_mesh_count >= 128) return; // stop after a couple of nodes for now
 			} else { // node == NULL
 				assert(false);
 			}
 		}
 
+#if 0
 		// next level
 		if (level == 4 && !(flags & NodeMetadata_Flags_LEAF)) { // bulk
-			return; // don't
+			//return; // don't
 			BulkMetadata* bulk = getBulk(path, root_epoch);
 			if (bulk != NULL) {
 				printf("metas %d\n", bulk->node_metadata().size());
@@ -453,6 +428,7 @@ void loadPlanet() {
 				delete bulk;
 			}
 		}
+#endif
 	}
 }
 
@@ -513,18 +489,6 @@ void initGL() {
 	texture_loc = glGetUniformLocation(program, "texture");
 	position_loc = glGetAttribLocation(program, "position");
 	texcoords_loc = glGetAttribLocation(program, "texcoords");
-}
-
-bool intersectRaySphere(vec3_t ro, vec3_t rd, vec3_t s, float r, float* t) {
-	vec3_t m;
-	VectorSubtract(ro, s, m);
-	float b = DotProduct(m, rd);
-	float c = DotProduct(m, m) - r * r;
-	if (c > 0.0f && b > 0.0f) return false;
-	float discr = b * b - c;
-	if (discr < 0.0f) return false;
-	*t = -b - sqrtf(discr);
-	return true;
 }
 
 mat4_t cam_rot = {
@@ -621,8 +585,17 @@ void drawPlanet() {
 	glUseProgram(program);
 	glEnableVertexAttribArray(position_loc);
 	glEnableVertexAttribArray(texcoords_loc);
-	for (int mesh_index = 8; mesh_index < planet_mesh_count; mesh_index++) {
+	int cam_level = (int)cam_zoom + 2;
+	float cam_lon_deg = 180.0f * cam_lon / M_PI;
+	float cam_lat_deg = 180.0f * cam_lat / M_PI;
+	for (int mesh_index = 0; mesh_index < planet_mesh_count; mesh_index++) {
 		PlanetMesh* planet_mesh = &planet_meshes[mesh_index];
+
+		if (cam_level != planet_mesh->level) continue;
+		if (cam_lon_deg < planet_mesh->lla_min[0] || 
+			cam_lon_deg > planet_mesh->lla_max[0] ||
+			cam_lat_deg < planet_mesh->lla_min[1] ||
+			cam_lat_deg > planet_mesh->lla_max[1]) continue;
 
 		MatrixMultiply(scale, planet_mesh->transform, temp0);
 		MatrixMultiply(temp1, temp0, modelview);
@@ -730,6 +703,9 @@ void mainloop() {
 }
 
 int main(int argc, char* argv[]) {
+	// create cache directory
+	createDir("cache");
+
 	int video_width = 768;
 	int video_height = 768;
 

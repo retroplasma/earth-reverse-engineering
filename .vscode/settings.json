@@ -68,6 +68,16 @@
 		"xstddef": "cpp",
 		"xtr1common": "cpp",
 		"xutility": "cpp",
-		"*.tcc": "cpp"
+		"*.tcc": "cpp",
+		"clocale": "cpp",
+		"cstdarg": "cpp",
+		"cwctype": "cpp",
+		"hash_map": "cpp",
+		"hash_set": "cpp",
+		"condition_variable": "cpp",
+		"memory_resource": "cpp",
+		"numeric": "cpp",
+		"optional": "cpp",
+		"cinttypes": "cpp"
 	}
 }
