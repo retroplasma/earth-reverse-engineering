@@ -502,6 +502,7 @@ float cam_lon = 0.0f;
 float cam_zoom = 0.0f;
 int mouse_x = 0, mouse_y = 0;
 int prev_mouse_x, prev_mouse_y;
+void drawCube();
 void drawPlanet() {
 	mat4_t temp0, temp1, temp2, translation, rotation, scale, modelview, transform;
 
@@ -640,7 +641,40 @@ void drawPlanet() {
 	glColor3f(1.0f, 0.0f, 1.0f);
 	glVertex3f(out[0], out[1], out[2]);
 	glEnd();
+	glColor3f(0.0f, 0.0f, 0.0f);
+	drawCube();
 	glEnable(GL_DEPTH_TEST);
+}
+
+void drawCube() {
+	glBegin(GL_LINES);
+	glVertex3f(-1.0f, -1.0f, -1.0f);
+	glVertex3f(1.0f, -1.0f, -1.0f);
+	glVertex3f(1.0f, -1.0f, -1.0f);
+	glVertex3f(1.0f, 1.0f, -1.0f);
+	glVertex3f(1.0f, 1.0f, -1.0f);
+	glVertex3f(-1.0f, 1.0f, -1.0f);
+	glVertex3f(-1.0f, 1.0f, -1.0f);
+	glVertex3f(-1.0f, -1.0f, -1.0f);
+
+	glVertex3f(-1.0f, -1.0f, 1.0f);
+	glVertex3f(1.0f, -1.0f, 1.0f);
+	glVertex3f(1.0f, -1.0f, 1.0f);
+	glVertex3f(1.0f, 1.0f, 1.0f);
+	glVertex3f(1.0f, 1.0f, 1.0f);
+	glVertex3f(-1.0f, 1.0f, 1.0f);
+	glVertex3f(-1.0f, 1.0f, 1.0f);
+	glVertex3f(-1.0f, -1.0f, 1.0f);
+
+	glVertex3f(-1.0f, -1.0f, -1.0f);
+	glVertex3f(-1.0f, -1.0f, 1.0f);
+	glVertex3f(1.0f, -1.0f, -1.0f);
+	glVertex3f(1.0f, -1.0f, 1.0f);
+	glVertex3f(1.0f, 1.0f, -1.0f);
+	glVertex3f(1.0f, 1.0f, 1.0f);
+	glVertex3f(-1.0f, 1.0f, -1.0f);
+	glVertex3f(-1.0f, 1.0f, 1.0f);
+	glEnd();
 }
 
 void init() {
