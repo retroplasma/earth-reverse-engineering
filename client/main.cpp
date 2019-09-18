@@ -132,7 +132,10 @@ NodeData* getNode(const char* path, int epoch, int texture_format, int imagery_e
 	unsigned char* data; size_t len;
 	if (!readFile(path_buf, &data, &len)) {
 		char url_buf[200];
-		sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!3u%d!4b0", path, epoch, texture_format, imagery_epoch);
+		if (imagery_epoch == -1)
+			sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!4b0", path, epoch, texture_format);
+		else
+			sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!3u%d!4b0", path, epoch, texture_format, imagery_epoch);		
 		if (!fetchData(url_buf, &data, &len)) return NULL;
 		writeFile(path_buf, data, len);
 	}
@@ -307,6 +310,25 @@ int unpackIndices(std::string packed, unsigned short** indices) {
 	return indices_len;
 }
 
+int getTextureFormat(BulkMetadata* bulk, NodeMetadata* node_meta) {
+	int tf = node_meta->has_available_texture_formats()
+				? node_meta->available_texture_formats()
+				: bulk->default_available_texture_formats();
+	if (tf & 1 << (6 - 1)) return 6;
+	if (tf & 1 << (1 - 1)) return 1;
+	return 6;
+}
+
+int getImageryEpoch(BulkMetadata* bulk, NodeMetadata* node_meta, int flags) {
+	if (flags & NodeMetadata_Flags_USE_IMAGERY_EPOCH) {
+		return node_meta->has_imagery_epoch()
+			? node_meta->imagery_epoch()
+			: bulk->default_imagery_epoch();
+	} else {
+		return -1;
+	}
+}
+
 void loadPlanet() {
 	PlanetoidMetadata* planetoid = getPlanetoid();
 	printf("earth radius: %f\n", planetoid->radius());
@@ -329,11 +351,10 @@ void loadPlanet() {
 		if (node_meta.meters_per_texel() != 0) meters_per_texel = node_meta.meters_per_texel();
 
 		if (!(flags & NodeMetadata_Flags_NODATA)) {
-			int imagery_epoch = node_meta.imagery_epoch();
-			if (flags & NodeMetadata_Flags_USE_IMAGERY_EPOCH) {
-				imagery_epoch = root_bulk->default_imagery_epoch();
-			}
-			NodeData* node = getNode(path, root_epoch, Texture_Format_DXT1, imagery_epoch);
+			int imagery_epoch = getImageryEpoch(root_bulk, &node_meta, flags);
+			int texture_format = getTextureFormat(root_bulk, &node_meta);
+
+			NodeData* node = getNode(path, node_meta.epoch(), texture_format, imagery_epoch);
 			if (node) {
 				PlanetMesh* planet_mesh = &planet_meshes[planet_mesh_count++];
 
