@@ -1,5 +1,9 @@
+#include <math.h>
 #include <fstream>
 #include <sys/stat.h>
+#ifdef _WIN32
+	#include <direct.h>
+#endif
 #include <SDL.h>
 #if defined(_WIN32) || defined(__linux__)
 	#include <glad/glad.h>
@@ -178,8 +182,8 @@ int unpackInt(std::string packed, int* index) {
 }
 
 short unpackShort(std::string packed, int* index) {
-	unsigned c = (unsigned)packed[(*index)++];
-	c |= (unsigned)packed[(*index)++] << 8;
+	unsigned c = (unsigned char)packed[(*index)++];
+	c |= (unsigned char)packed[(*index)++] << 8;
 	//return c & 32768 ? c | 4294901760 : c; // to signed short
 	return (short)c;
 }
@@ -209,6 +213,7 @@ void unpackObb(std::string data, vec3_t head_node_center, float meters_per_texel
 	float s1 = sinf(euler[1]);
 	float c2 = cosf(euler[2]);
 	float s2 = sinf(euler[2]);
+	MatrixIdentity(obb->orientation);
 	obb->orientation[0] = c0 * c2 - c1 * s0 * s2;
 	obb->orientation[1] = c1 * c0 * s2 + c2 * s0;
 	obb->orientation[2] = s2 * s1;
@@ -218,7 +223,6 @@ void unpackObb(std::string data, vec3_t head_node_center, float meters_per_texel
 	obb->orientation[8] = s1 * s0;
 	obb->orientation[9] = -c0 * s1;
 	obb->orientation[10] = c1;
-	MatrixTranspose(obb->orientation); // from js
 }
 
 // from minified js (only positions)
@@ -343,10 +347,10 @@ void loadPlanet() {
 				printf("node %.*s %.2f to %.2f, %.2f to %.2f\n", level, path,
 					planet_mesh->lla_min[0], planet_mesh->lla_max[0],
 					planet_mesh->lla_min[1], planet_mesh->lla_max[1]);
-
+				
 				unpackObb(node_meta.oriented_bounding_box(), head_node_center,
 					meters_per_texel, &planet_mesh->obb);
-				
+
 				for (int i = 0; i < 16; i++) planet_mesh->transform[i] = (float)node->matrix_globe_from_mesh(i);
 
 				for (auto mesh : node->meshes()) {
@@ -504,7 +508,9 @@ int mouse_x = 0, mouse_y = 0;
 int prev_mouse_x, prev_mouse_y;
 void drawCube();
 void drawPlanet() {
-	mat4_t temp0, temp1, temp2, translation, rotation, scale, modelview, transform;
+	mat4_t temp0, temp1, temp2, 
+		translation, rotation, scale, 
+		model, view, modelview, projection, transform;
 
 	int width, height;
 	SDL_GL_GetDrawableSize(sdl_window, &width, &height);
@@ -512,7 +518,6 @@ void drawPlanet() {
 	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	mat4_t projection;
 	float aspect_ratio = (float)width / (float)height;
 	float fov = 0.25f * (float)M_PI;
 	float right_plane, top_plane, near_plane = 0.01f;
@@ -589,6 +594,7 @@ void drawPlanet() {
 	int cam_level = (int)cam_zoom + 2;
 	float cam_lon_deg = 180.0f * cam_lon / M_PI;
 	float cam_lat_deg = 180.0f * cam_lat / M_PI;
+	PlanetMesh* planet_mesh_drawn = NULL;
 	for (int mesh_index = 0; mesh_index < planet_mesh_count; mesh_index++) {
 		PlanetMesh* planet_mesh = &planet_meshes[mesh_index];
 
@@ -613,6 +619,8 @@ void drawPlanet() {
 		glVertexAttribPointer(texcoords_loc, 2, GL_UNSIGNED_SHORT, GL_FALSE, 8, (void*)4);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, planet_mesh->indices_buffer);
 		glDrawElements(GL_TRIANGLES, planet_mesh->element_count, GL_UNSIGNED_SHORT, NULL);
+
+		planet_mesh_drawn = planet_mesh;
 	}
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -642,7 +650,24 @@ void drawPlanet() {
 	glVertex3f(out[0], out[1], out[2]);
 	glEnd();
 	glColor3f(0.0f, 0.0f, 0.0f);
-	drawCube();
+	if (planet_mesh_drawn) { // visualize obb
+		MatrixCopy(temp1, view);
+		
+		MatrixCopy(scale, temp0); // save
+		MatrixTranslation(planet_mesh_drawn->obb.center, translation);
+		MatrixCopy(planet_mesh_drawn->obb.orientation, rotation);
+		MatrixScale(planet_mesh_drawn->obb.extents, scale);
+
+		MatrixMultiply(rotation, scale, temp2);
+		MatrixMultiply(translation, temp2, temp1);
+		MatrixMultiply(temp0, temp1, model);
+		MatrixMultiply(view, model, modelview);
+
+		glPushMatrix();
+		glLoadMatrixf(modelview);
+		drawCube();
+		glPopMatrix();
+	}
 	glEnable(GL_DEPTH_TEST);
 }
 
