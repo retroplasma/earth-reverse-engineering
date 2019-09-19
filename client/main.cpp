@@ -150,7 +150,7 @@ NodeData* getNode(const char* path, int epoch, int texture_format, int imagery_e
 struct OrientedBoundingBox {
 	vec3_t center;
 	vec3_t extents;
-	mat4_t orientation;
+	mat3_t orientation;
 };
 
 struct PlanetMesh {
@@ -213,16 +213,15 @@ void unpackObb(std::string data, vec3_t head_node_center, float meters_per_texel
 	float s1 = sinf(euler[1]);
 	float c2 = cosf(euler[2]);
 	float s2 = sinf(euler[2]);
-	MatrixIdentity(obb->orientation);
 	obb->orientation[0] = c0 * c2 - c1 * s0 * s2;
 	obb->orientation[1] = c1 * c0 * s2 + c2 * s0;
 	obb->orientation[2] = s2 * s1;
-	obb->orientation[4] = -c0 * s2 - c2 * c1 * s0;
-	obb->orientation[5] = c0 * c1 * c2 - s0 * s2;
-	obb->orientation[6] = c2 * s1;
-	obb->orientation[8] = s1 * s0;
-	obb->orientation[9] = -c0 * s1;
-	obb->orientation[10] = c1;
+	obb->orientation[3] = -c0 * s2 - c2 * c1 * s0;
+	obb->orientation[4] = c0 * c1 * c2 - s0 * s2;
+	obb->orientation[5] = c2 * s1;
+	obb->orientation[6] = s1 * s0;
+	obb->orientation[7] = -c0 * s1;
+	obb->orientation[8] = c1;
 }
 
 // from minified js (only positions)
@@ -603,10 +602,10 @@ void drawPlanet() {
 		PlanetMesh* planet_mesh = &planet_meshes[mesh_index];
 
 		if (cam_level != planet_mesh->level) continue;
-		if (cam_lon_deg < planet_mesh->lla_min[0] || 
-			cam_lon_deg > planet_mesh->lla_max[0] ||
-			cam_lat_deg < planet_mesh->lla_min[1] ||
-			cam_lat_deg > planet_mesh->lla_max[1]) continue;
+		//if (cam_lon_deg < planet_mesh->lla_min[0] || 
+		//	cam_lon_deg > planet_mesh->lla_max[0] ||
+		//	cam_lat_deg < planet_mesh->lla_min[1] ||
+		//	cam_lat_deg > planet_mesh->lla_max[1]) continue;
 
 		MatrixMultiply(scale, planet_mesh->transform, temp0);
 		MatrixMultiply(temp1, temp0, modelview);
@@ -659,7 +658,7 @@ void drawPlanet() {
 		
 		MatrixCopy(scale, temp0); // save
 		MatrixTranslation(planet_mesh_drawn->obb.center, translation);
-		MatrixCopy(planet_mesh_drawn->obb.orientation, rotation);
+		MatrixCopy34(planet_mesh_drawn->obb.orientation, rotation);
 		MatrixScale(planet_mesh_drawn->obb.extents, scale);
 
 		MatrixMultiply(rotation, scale, temp2);
