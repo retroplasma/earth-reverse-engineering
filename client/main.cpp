@@ -329,11 +329,15 @@ void loadPlanet() {
 		if (node_meta.meters_per_texel() != 0) meters_per_texel = node_meta.meters_per_texel();
 
 		if (!(flags & NodeMetadata_Flags_NODATA)) {
+			int epoch = root_epoch;
+			if (node_meta.has_epoch()) epoch = node_meta.epoch();
+			int texture_format = root_bulk->default_available_texture_formats();
+			if (node_meta.has_available_texture_formats()) texture_format = node_meta.available_texture_formats();
 			int imagery_epoch = node_meta.imagery_epoch();
 			if (flags & NodeMetadata_Flags_USE_IMAGERY_EPOCH) {
 				imagery_epoch = root_bulk->default_imagery_epoch();
 			}
-			NodeData* node = getNode(path, root_epoch, Texture_Format_DXT1, imagery_epoch);
+			NodeData* node = getNode(path, epoch, texture_format, imagery_epoch);
 			if (node) {
 				PlanetMesh* planet_mesh = &planet_meshes[planet_mesh_count++];
 
