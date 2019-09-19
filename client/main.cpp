@@ -128,11 +128,18 @@ BulkMetadata* getBulk(const char* path, int epoch) {
 
 NodeData* getNode(const char* path, int epoch, int texture_format, int imagery_epoch) {
 	char path_buf[200];
-	sprintf(path_buf, "cache/node_%s_%d_%d_%d.bin", path, epoch, texture_format, imagery_epoch);
+	sprintf(path_buf, "cache/node_%s_%d_%d_%d.bin",
+		path, epoch, texture_format, imagery_epoch);
 	unsigned char* data; size_t len;
 	if (!readFile(path_buf, &data, &len)) {
 		char url_buf[200];
-		sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!3u%d!4b0", path, epoch, texture_format, imagery_epoch);
+		if (imagery_epoch == -1) { // none
+			sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!4b0",
+				path, epoch, texture_format);
+		} else {
+			sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!3u%d!4b0",
+				path, epoch, texture_format, imagery_epoch);
+		}
 		if (!fetchData(url_buf, &data, &len)) return NULL;
 		writeFile(path_buf, data, len);
 	}
@@ -328,14 +335,33 @@ void loadPlanet() {
 		if (node_meta.meters_per_texel() != 0) meters_per_texel = node_meta.meters_per_texel();
 
 		if (!(flags & NodeMetadata_Flags_NODATA)) {
-			int epoch = root_epoch;
-			if (node_meta.has_epoch()) epoch = node_meta.epoch();
-			int texture_format = root_bulk->default_available_texture_formats();
-			if (node_meta.has_available_texture_formats()) texture_format = node_meta.available_texture_formats();
-			int imagery_epoch = node_meta.imagery_epoch();
-			if (flags & NodeMetadata_Flags_USE_IMAGERY_EPOCH) {
-				imagery_epoch = root_bulk->default_imagery_epoch();
+			int epoch = node_meta.has_epoch() ? node_meta.epoch() : root_epoch;
+
+			int available_texture_formats = node_meta.has_available_texture_formats() ?
+				node_meta.available_texture_formats() :
+				root_bulk->default_available_texture_formats();
+
+			static int supported_texture_formats[] = { // ordered by preference
+				Texture_Format_CRN_DXT1,
+				Texture_Format_DXT1,
+				Texture_Format_JPG,
+			};
+
+			int texture_format = Texture_Format_JPG;
+			for (int supported_texture_format : supported_texture_formats) {
+				if (available_texture_formats & (1 << (supported_texture_format - 1))) {
+					texture_format = supported_texture_format;
+					break;
+				}
 			}
+
+			int imagery_epoch = -1; // do not use imagery epoch
+			if (flags & NodeMetadata_Flags_USE_IMAGERY_EPOCH) {
+				imagery_epoch = node_meta.has_imagery_epoch() ?
+					node_meta.imagery_epoch() :
+					root_bulk->default_imagery_epoch();
+			}
+
 			NodeData* node = getNode(path, epoch, texture_format, imagery_epoch);
 			if (node) {
 				PlanetMesh* planet_mesh = &planet_meshes[planet_mesh_count++];
