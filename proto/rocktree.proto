@@ -67,6 +67,7 @@ message NodeData {
     repeated double kml_bounding_box = 5 [packed = true];
     optional Mesh water_mesh = 6;
     repeated Mesh overlay_surface_meshes = 7;
+    optional bytes for_normals = 8;
 }
 
 message Mesh {
