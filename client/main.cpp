@@ -230,31 +230,42 @@ void unpackObb(std::string data, vec3_t head_node_center, float meters_per_texel
 	obb->orientation[8] = c1;
 }
 
+#pragma pack(push, 1) 
+struct vertex {
+	uint8_t x, y, z, w;
+	uint16_t u, v;
+};
+#pragma pack(pop)
+static_assert((sizeof(vertex) == 8), "vertex size must be 8");
+
 // from minified js (only positions)
 int unpackVertices(std::string packed, uint8_t** vertices) {
-	auto input = (uint8_t*)packed.data();
+	auto data = (uint8_t*)packed.data();
 	auto count = packed.size() / 3;
-	*vertices = new uint8_t[8 * count];
-	for (auto axis = 0; axis < 3; axis++) {
-		uint8_t cycle = 0;
-		for (auto j = 0; j < count; j++) {
-			(*vertices)[8 * j + axis] = cycle += *(input++);
-		}
+	auto vtx = new vertex[count];
+	uint8_t x = 0, y = 0, z = 0; // 8 bit for % 0x100
+	for (auto i = 0; i < count; i++) {
+		vtx[i].x = x += data[count * 0 + i];
+		vtx[i].y = y += data[count * 1 + i];
+		vtx[i].z = z += data[count * 2 + i];
 	}
-	return 8 * count;
+	*vertices = (uint8_t*)vtx;
+	return sizeof(vertex) * count;
 }
 
 // from minified js
 void unpackTexCoords(std::string packed, uint8_t* vertices, int vertices_len) {	
 	auto data = (uint8_t*)packed.data();
-	auto count = vertices_len / 8;
+	auto count = vertices_len / sizeof(vertex);
+	assert(count == (packed.size() - 4) / 4);
 	auto u_mod = 1 + *(uint16_t *)(data + 0);
 	auto v_mod = 1 + *(uint16_t *)(data + 2);
 	data += 4;
-	auto u_cycle = 0, v_cycle = 0;
-	for (auto j = 0; j < count; j++, vertices += 8, data++) {
-		*(uint16_t*)(vertices + 4) = u_cycle = (u_cycle + data[0 * count] + (data[2 * count] << 8)) % u_mod;
-		*(uint16_t*)(vertices + 6) = v_cycle = (v_cycle + data[1 * count] + (data[3 * count] << 8)) % v_mod;
+	auto vtx = (vertex*)vertices;
+	auto u = 0, v = 0;	
+	for (auto i = 0; i < count; i++) {
+		vtx[i].u = u = (u + data[count * 0 + i] + (data[count * 2 + i] << 8)) % u_mod;
+		vtx[i].v = v = (v + data[count * 1 + i] + (data[count * 3 + i] << 8)) % v_mod;
 	}
 }
 
