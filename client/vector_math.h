@@ -1,5 +1,6 @@
 typedef float vec3_t[3];
-//typedef union { struct { float x, y, z; }; float e[3]; } vec3;
+typedef float vec4_t[4];
+typedef float mat3_t[9];
 typedef float mat4_t[16];
 
 void VectorAdd(vec3_t a, vec3_t b, vec3_t out) {
@@ -20,7 +21,7 @@ void VectorCopy(vec3_t in, vec3_t out) {
 	out[2] = in[2];
 }
 
-void VectorScale (vec3_t in, float scale, vec3_t out) {
+void VectorScale(vec3_t in, float scale, vec3_t out) {
 	out[0] = in[0] * scale;
 	out[1] = in[1] * scale;
 	out[2] = in[2] * scale;
@@ -54,6 +55,13 @@ void MatrixIdentity(mat4_t out) {
 
 void MatrixCopy(mat4_t in, mat4_t out) {
 	memcpy(out, in, sizeof(mat4_t));
+}
+
+void MatrixCopy34(mat3_t in, mat4_t out) {
+	out[0] = in[0]; out[1] = in[1]; out[2] = in[2]; out[3] = 0.0f;
+	out[4] = in[3]; out[5] = in[4]; out[6] = in[5]; out[7] = 0.0f;
+	out[8] = in[6]; out[9] = in[7]; out[10] = in[8]; out[11] = 0.0f;
+	out[12] = 0.0f; out[13] = 0.0f; out[14] = 0.0f; out[15] = 1.0f;
 }
 
 void MatrixTranspose(mat4_t m) {

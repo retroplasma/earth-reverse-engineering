@@ -128,14 +128,18 @@ BulkMetadata* getBulk(const char* path, int epoch) {
 
 NodeData* getNode(const char* path, int epoch, int texture_format, int imagery_epoch) {
 	char path_buf[200];
-	sprintf(path_buf, "cache/node_%s_%d_%d_%d.bin", path, epoch, texture_format, imagery_epoch);
+	sprintf(path_buf, "cache/node_%s_%d_%d_%d.bin",
+		path, epoch, texture_format, imagery_epoch);
 	unsigned char* data; size_t len;
 	if (!readFile(path_buf, &data, &len)) {
 		char url_buf[200];
-		if (imagery_epoch == -1)
-			sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!4b0", path, epoch, texture_format);
-		else
-			sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!3u%d!4b0", path, epoch, texture_format, imagery_epoch);		
+		if (imagery_epoch == -1) { // none
+			sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!4b0",
+				path, epoch, texture_format);
+		} else {
+			sprintf(url_buf, "NodeData/pb=!1m2!1s%s!2u%d!2e%d!3u%d!4b0",
+				path, epoch, texture_format, imagery_epoch);
+		}
 		if (!fetchData(url_buf, &data, &len)) return NULL;
 		writeFile(path_buf, data, len);
 	}
@@ -153,7 +157,7 @@ NodeData* getNode(const char* path, int epoch, int texture_format, int imagery_e
 struct OrientedBoundingBox {
 	vec3_t center;
 	vec3_t extents;
-	mat4_t orientation;
+	mat3_t orientation;
 };
 
 struct PlanetMesh {
@@ -215,16 +219,15 @@ void unpackObb(std::string data, vec3_t head_node_center, float meters_per_texel
 	float s1 = sinf(euler[1]);
 	float c2 = cosf(euler[2]);
 	float s2 = sinf(euler[2]);
-	MatrixIdentity(obb->orientation);
 	obb->orientation[0] = c0 * c2 - c1 * s0 * s2;
 	obb->orientation[1] = c1 * c0 * s2 + c2 * s0;
 	obb->orientation[2] = s2 * s1;
-	obb->orientation[4] = -c0 * s2 - c2 * c1 * s0;
-	obb->orientation[5] = c0 * c1 * c2 - s0 * s2;
-	obb->orientation[6] = c2 * s1;
-	obb->orientation[8] = s1 * s0;
-	obb->orientation[9] = -c0 * s1;
-	obb->orientation[10] = c1;
+	obb->orientation[3] = -c0 * s2 - c2 * c1 * s0;
+	obb->orientation[4] = c0 * c1 * c2 - s0 * s2;
+	obb->orientation[5] = c2 * s1;
+	obb->orientation[6] = s1 * s0;
+	obb->orientation[7] = -c0 * s1;
+	obb->orientation[8] = c1;
 }
 
 // from minified js (only positions)
@@ -294,27 +297,6 @@ int unpackIndices(std::string packed, uint16_t** indices) {
 	return triangles_len;
 }
 
-Texture_Format getTextureFormat(BulkMetadata* bulk, NodeMetadata* node_meta) {
-	int tf = node_meta->has_available_texture_formats()
-				? node_meta->available_texture_formats()
-				: bulk->default_available_texture_formats();
-	
-	Texture_Format fmts[] = {Texture_Format_CRN_DXT1, Texture_Format_JPG};
-	for(auto fmt : fmts)
-		if (tf & 1 << (fmt - 1)) return fmt;
-	return fmts[0];
-}
-
-int getImageryEpoch(BulkMetadata* bulk, NodeMetadata* node_meta, int flags) {
-	if (flags & NodeMetadata_Flags_USE_IMAGERY_EPOCH) {
-		return node_meta->has_imagery_epoch()
-			? node_meta->imagery_epoch()
-			: bulk->default_imagery_epoch();
-	} else {
-		return -1;
-	}
-}
-
 void loadPlanet() {
 	PlanetoidMetadata* planetoid = getPlanetoid();
 	printf("earth radius: %f\n", planetoid->radius());
@@ -337,9 +319,32 @@ void loadPlanet() {
 		if (node_meta.meters_per_texel() != 0) meters_per_texel = node_meta.meters_per_texel();
 
 		if (!(flags & NodeMetadata_Flags_NODATA)) {
-			int imagery_epoch = getImageryEpoch(root_bulk, &node_meta, flags);
-			int texture_format = (int)getTextureFormat(root_bulk, &node_meta);
+			int available_texture_formats = node_meta.has_available_texture_formats() ?
+				node_meta.available_texture_formats() :
+				root_bulk->default_available_texture_formats();
 
+			static int supported_texture_formats[] = { // ordered by preference
+				Texture_Format_CRN_DXT1,
+				Texture_Format_DXT1,
+				Texture_Format_JPG,
+			};
+
+			int texture_format = supported_texture_formats[0];
+			for (int supported_texture_format : supported_texture_formats) {
+				if (available_texture_formats & (1 << (supported_texture_format - 1))) {
+					texture_format = supported_texture_format;
+					break;
+				}
+			}
+
+			int imagery_epoch = -1; // do not use imagery epoch
+			if (flags & NodeMetadata_Flags_USE_IMAGERY_EPOCH) {
+				imagery_epoch = node_meta.has_imagery_epoch() ?
+					node_meta.imagery_epoch() :
+					root_bulk->default_imagery_epoch();
+			}
+
+			assert(node_meta.has_epoch());
 			NodeData* node = getNode(path, node_meta.epoch(), texture_format, imagery_epoch);
 			if (node) {
 				PlanetMesh* planet_mesh = &planet_meshes[planet_mesh_count++];
@@ -606,10 +611,10 @@ void drawPlanet() {
 		PlanetMesh* planet_mesh = &planet_meshes[mesh_index];
 
 		if (cam_level != planet_mesh->level) continue;
-		if (cam_lon_deg < planet_mesh->lla_min[0] || 
-			cam_lon_deg > planet_mesh->lla_max[0] ||
-			cam_lat_deg < planet_mesh->lla_min[1] ||
-			cam_lat_deg > planet_mesh->lla_max[1]) continue;
+		//if (cam_lon_deg < planet_mesh->lla_min[0] || 
+		//	cam_lon_deg > planet_mesh->lla_max[0] ||
+		//	cam_lat_deg < planet_mesh->lla_min[1] ||
+		//	cam_lat_deg > planet_mesh->lla_max[1]) continue;
 
 		MatrixMultiply(scale, planet_mesh->transform, temp0);
 		MatrixMultiply(temp1, temp0, modelview);
@@ -662,7 +667,7 @@ void drawPlanet() {
 		
 		MatrixCopy(scale, temp0); // save
 		MatrixTranslation(planet_mesh_drawn->obb.center, translation);
-		MatrixCopy(planet_mesh_drawn->obb.orientation, rotation);
+		MatrixCopy34(planet_mesh_drawn->obb.orientation, rotation);
 		MatrixScale(planet_mesh_drawn->obb.extents, scale);
 
 		MatrixMultiply(rotation, scale, temp2);
