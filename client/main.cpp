@@ -173,7 +173,7 @@ struct PlanetMesh {
 int planet_mesh_count = 0;
 float planet_radius;
 
-int unpackInt(std::string packed, int* index) {
+int unpackVarInt(std::string packed, int* index) {
 	int c = 0, d = 1;
 	int e;
 	do {
@@ -185,16 +185,15 @@ int unpackInt(std::string packed, int* index) {
 }
 
 short unpackShort(std::string packed, int* index) {
-	unsigned c = (unsigned char)packed[(*index)++];
-	c |= (unsigned char)packed[(*index)++] << 8;
-	//return c & 32768 ? c | 4294901760 : c; // to signed short
-	return (short)c;
+	auto result = *(short*)(packed.data() + *index);
+	*index += 2;
+	return result;
 }
 
 unsigned short unpackUnsignedShort(std::string packed, int* index) {
-	unsigned c = (unsigned)packed[(*index)++];
-	c |= (unsigned)packed[(*index)++] << 8;
-	return (unsigned short)c;
+	auto result = *(unsigned short*)(packed.data() + *index);
+	*index += 2;
+	return result;
 }
 
 // from decode-resource.js:407
@@ -229,94 +228,81 @@ void unpackObb(std::string data, vec3_t head_node_center, float meters_per_texel
 }
 
 // from minified js (only positions)
-int unpackVertices(std::string packed, unsigned char** vertices) {
-	int i = 0;
-	int h = packed.size();
-	int k = h / 3;
-	*vertices = new unsigned char[8 * k];
-	for (int m = 0; m < 3; m++) { // m == stride
-		int p = (unsigned char)packed[i++];
-		(*vertices)[m] = p;
-		for (int v = 1; v < k; v++) {
-			p = (p + packed[i++]) & 0xFF;
-			(*vertices)[8 * v + m] = p;
+int unpackVertices(std::string packed, uint8_t** vertices) {
+	auto input = (uint8_t*)packed.data();
+	auto count = packed.size() / 3;
+	*vertices = new uint8_t[8 * count];
+	for (auto axis = 0; axis < 3; axis++) {
+		uint8_t cycle = 0;
+		for (auto j = 0; j < count; j++) {
+			(*vertices)[8 * j + axis] = cycle += *(input++);
 		}
 	}
-	return 8 * k;
+	return 8 * count;
 }
 
 // from minified js
-void unpackTexCoords(std::string packed, unsigned char* vertices, int vertices_len) {
-	int h = vertices_len / 8;
-	int i = 0;
-	int k = (unsigned char)packed[i++];
-	k += (unsigned char)packed[i++] << 8; // 65535
-	int g = (unsigned char)packed[i++];
-	g += (unsigned char)packed[i++] << 8; // 65535
-	assert(k == (1 << 16) - 1);
-	assert(g == (1 << 16) - 1);
-	int m = 0, p = 0;
-	for (int B = 0; B < h; B++) {
-		m = (m + ((unsigned char)packed[i + 0 * h + B] + 
-				 ((unsigned char)packed[i + 2 * h + B] << 8))) & k; // 18418, 18455
-		p = (p + ((unsigned char)packed[i + 1 * h + B] + 
-				 ((unsigned char)packed[i + 3 * h + B] << 8))) & g; // 49234, 45007
-		int A = 8 * B + 4;
-		vertices[A + 0] = m & 0xFF;
-		vertices[A + 1] = m >> 8;
-		vertices[A + 2] = p & 0xFF;
-		vertices[A + 3] = p >> 8;
+void unpackTexCoords(std::string packed, uint8_t* vertices, int vertices_len) {	
+	auto data = (uint8_t*)packed.data();
+	auto count = vertices_len / 8;
+	auto u_mod = 1 + *(uint16_t *)(data + 0);
+	auto v_mod = 1 + *(uint16_t *)(data + 2);
+	data += 4;
+	auto u_cycle = 0, v_cycle = 0;
+	for (auto j = 0; j < count; j++, vertices += 8, data++) {
+		*(uint16_t*)(vertices + 4) = u_cycle = (u_cycle + data[0 * count] + (data[2 * count] << 8)) % u_mod;
+		*(uint16_t*)(vertices + 6) = v_cycle = (v_cycle + data[1 * count] + (data[3 * count] << 8)) % v_mod;
 	}
 }
 
 // from minified js
-int unpackIndices(std::string packed, unsigned short** indices) {
-	int i = 0;
-	int e = unpackInt(packed, &i);
-	int g = 0; // numNonDegenerateTriangles
-	unsigned short* buffer = new unsigned short[e];
-	for (int k = 0, m, p = 0, v = 0, z = 0; z < e; z++) {
-		int B = unpackInt(packed, &i);
-		m = p;
-		p = v;
-		v = k - B;
-		buffer[z] = v;
-		m != p && p != v && m != v && g++;
-		B || k++;
-	}
+int unpackIndices(std::string packed, uint16_t** indices) {
+	auto offset = 0;	
 
-	// TODO: move to single loop
-	int indices_len = 3 * g;
-	*indices = new unsigned short[indices_len];
-	indices_len = 0;
-	for (int i = 0; i < e - 2; i++) {
-		int a = buffer[i + 0];
-		int b = buffer[i + 1];
-		int c = buffer[i + 2];
+	// packed -> triangle strip
+	auto triangle_strip_len = unpackVarInt(packed, &offset);	
+	auto triangle_strip = new uint16_t[triangle_strip_len];
+	auto num_non_degenerate_triangles = 0;
+	for (int zeros = 0, a, b = 0, c = 0, i = 0; i < triangle_strip_len; i++) {
+		int val = unpackVarInt(packed, &offset);
+		triangle_strip[i] = a = b, b = c, c = zeros - val;
+		if (a != b && a != c && b != c) num_non_degenerate_triangles++;
+		if (0 == val) zeros++;
+	}	
+	
+	// triangle strip -> triangles
+	auto triangles_len = 3 * num_non_degenerate_triangles;
+	auto triangles = new uint16_t[triangles_len];
+	for (int i = 0, j = 0; i < triangle_strip_len - 2; i++) {
+		int a = triangle_strip[i + 0];
+		int b = triangle_strip[i + 1];
+		int c = triangle_strip[i + 2];
 		if (a == b || a == c || b == c) continue;
 		if (i & 1) { // reverse winding
-			(*indices)[indices_len++] = a;
-			(*indices)[indices_len++] = c;
-			(*indices)[indices_len++] = b;
+			triangles[j++] = a;
+			triangles[j++] = c;
+			triangles[j++] = b;
 		} else {
-			(*indices)[indices_len++] = a;
-			(*indices)[indices_len++] = b;
-			(*indices)[indices_len++] = c;
+			triangles[j++] = a;
+			triangles[j++] = b;
+			triangles[j++] = c;
 		}
 	}
 
-	delete [] buffer;
-
-	return indices_len;
+	*indices = triangles;
+	delete [] triangle_strip;
+	return triangles_len;
 }
 
-int getTextureFormat(BulkMetadata* bulk, NodeMetadata* node_meta) {
+Texture_Format getTextureFormat(BulkMetadata* bulk, NodeMetadata* node_meta) {
 	int tf = node_meta->has_available_texture_formats()
 				? node_meta->available_texture_formats()
 				: bulk->default_available_texture_formats();
-	if (tf & 1 << (6 - 1)) return 6;
-	if (tf & 1 << (1 - 1)) return 1;
-	return 6;
+	
+	Texture_Format fmts[] = {Texture_Format_CRN_DXT1, Texture_Format_JPG};
+	for(auto fmt : fmts)
+		if (tf & 1 << (fmt - 1)) return fmt;
+	return fmts[0];
 }
 
 int getImageryEpoch(BulkMetadata* bulk, NodeMetadata* node_meta, int flags) {
@@ -352,7 +338,7 @@ void loadPlanet() {
 
 		if (!(flags & NodeMetadata_Flags_NODATA)) {
 			int imagery_epoch = getImageryEpoch(root_bulk, &node_meta, flags);
-			int texture_format = getTextureFormat(root_bulk, &node_meta);
+			int texture_format = (int)getTextureFormat(root_bulk, &node_meta);
 
 			NodeData* node = getNode(path, node_meta.epoch(), texture_format, imagery_epoch);
 			if (node) {
