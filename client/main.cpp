@@ -308,6 +308,110 @@ int unpackIndices(std::string packed, uint16_t** indices) {
 	return triangles_len;
 }
 
+int unpackNormals(const Mesh mesh, const uint8_t*unpacked_for_normals, int unpacked_for_normals_len, uint8_t**unpacked_normals)
+{
+	auto normals = mesh.normals();
+	uint8_t *new_normals = NULL;
+	int count = 0;
+	if (mesh.has_normals() && unpacked_for_normals) {
+		count = normals.size() / 2;		
+		new_normals = new uint8_t[4 * count];
+		auto input = (uint8_t*)normals.data();
+		for (auto i = 0; i < count; ++i) {
+			int j = input[i] + (input[count + i] << 8);
+			assert(3 * j + 2 < unpacked_for_normals_len);
+			new_normals[4 * i + 0] = unpacked_for_normals[3 * j + 0];
+			new_normals[4 * i + 1] = unpacked_for_normals[3 * j + 1];
+			new_normals[4 * i + 2] = unpacked_for_normals[3 * j + 2];
+			new_normals[4 * i + 3] = 0;			
+		}
+	} else {
+		count = (mesh.vertices().size() / 3) * 8;
+		new_normals = new uint8_t[4 * count];
+		for (auto i = 0; i < count; ++i) {
+			new_normals[4 * i + 0] = 127;
+			new_normals[4 * i + 1] = 127;
+			new_normals[4 * i + 2] = 127;
+			new_normals[4 * i + 3] = 0;;
+		}
+	}
+	*unpacked_normals = new_normals;
+	return 4 * count;
+}
+
+int unpackForNormals(const NodeData nodeData, uint8_t**unpacked_for_normals)
+{
+	auto f1 = [](int v, int l) {
+		if (4 >= l)
+			return (v << l) + (v & (1 << l) - 1);
+		if (6 >= l) {
+			auto r = 8 - l;
+			return (v << l) + (v << l >> r) + (v << l >> r >> r) + (v << l >> r >> r >> r);
+		}
+		return -(v & 1);
+	};
+	auto f2 = [](double c) {
+		auto cr = (int)round(c);
+		if (cr < 0) return 0;
+		if (cr > 255) return 255;
+		return cr;
+	};
+	assert(nodeData.has_for_normals());
+	auto input = nodeData.for_normals();
+	auto data = (uint8_t*)input.data();
+	auto size = input.size();
+	assert(size > 2);
+	auto count = *(uint16_t*)data;
+	assert(count * 2 == size - 3);
+	int s = data[2];
+	data += 3;
+
+	auto output = new uint8_t[3 * count];
+	
+	for (auto i = 0; i < count; i++) {
+		double a = f1(data[0 + i], s) / 255.0;
+		double f = f1(data[count + i], s) / 255.0;
+			
+		double b = a, c = f, g = b + c, h = b - c;
+		int sign = 1;
+
+		if (!(.5 <= g && 1.5 >= g && -.5 <= h && .5 >= h)) {
+			sign = -1;
+			if (.5 >= g) {
+				b = .5 - f;
+				c = .5 - a;
+			} else {
+				if (1.5 <= g) {
+					b = 1.5 - f;
+					c = 1.5 - a;
+				} else {
+					if (-.5 >= h) {
+						b = f - .5;
+						c = a + .5;
+					} else {
+						b = f + .5;
+						c = a - .5;
+					}
+				}
+			}
+			g = b + c;
+			h = b - c;
+		}
+		
+		a = fmin(fmin(2 * g - 1, 3 - 2 * g), fmin(2 * h + 1, 1 - 2 * h)) * sign;
+		b = 2 * b - 1;
+		c = 2 * c - 1;
+		auto m = 127 / sqrt(a * a + b * b + c * c);
+
+		output[3 * i + 0] = f2(m * a + 127);
+		output[3 * i + 1] = f2(m * b + 127);
+		output[3 * i + 2] = f2(m * c + 127);		
+	}
+
+	*unpacked_for_normals = output;
+	return 3 * count;
+}
+
 void loadPlanet() {
 	PlanetoidMetadata* planetoid = getPlanetoid();
 	printf("earth radius: %f\n", planetoid->radius());
