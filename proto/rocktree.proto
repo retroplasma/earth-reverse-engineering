@@ -1,0 +1,156 @@
+syntax = "proto2";
+
+package geo_globetrotter_proto_rocktree;
+
+message BulkMetadataRequest {
+    optional NodeKey node_key = 1;
+}
+
+message NodeDataRequest {
+    optional NodeKey node_key = 1;
+    optional Texture.Format texture_format = 2;
+    optional uint32 imagery_epoch = 3;
+}
+
+message NodeKey {
+    optional string path = 1;
+    optional uint32 epoch = 2;
+}
+
+message CopyrightRequest {
+    optional uint32 epoch = 1;
+}
+
+message TextureDataRequest {
+    optional NodeKey node_key = 1;
+    optional Texture.Format texture_format = 2;
+    optional Texture.ViewDirection view_direction = 3;
+}
+
+message BulkMetadata {
+    repeated NodeMetadata node_metadata = 1;
+    optional NodeKey head_node_key = 2;
+    repeated double head_node_center = 3 [packed = true];
+    repeated float meters_per_texel = 4 [packed = true];
+    optional uint32 default_imagery_epoch = 5;
+    optional uint32 default_available_texture_formats = 6;
+    optional uint32 default_available_view_dependent_textures = 7;
+    optional uint32 default_available_view_dependent_texture_formats = 8;
+}
+
+message NodeMetadata {
+    optional uint32 path_and_flags = 1;
+    optional uint32 epoch = 2;
+    optional uint32 bulk_metadata_epoch = 5;
+    optional bytes oriented_bounding_box = 3;
+    optional float meters_per_texel = 4;
+    repeated double processing_oriented_bounding_box = 6 [packed = true];
+    optional uint32 imagery_epoch = 7;
+    optional uint32 available_texture_formats = 8;
+    optional uint32 available_view_dependent_textures = 9;
+    optional uint32 available_view_dependent_texture_formats = 10;
+    
+    enum Flags {
+        RICH3D_LEAF = 1;
+        RICH3D_NODATA = 2;
+        LEAF = 4;
+        NODATA = 8;
+        USE_IMAGERY_EPOCH = 16;
+    }
+}
+
+message NodeData {
+    repeated double matrix_globe_from_mesh = 1 [packed = true];
+    repeated Mesh meshes = 2;
+    repeated uint32 copyright_ids = 3;
+    optional NodeKey node_key = 4;
+    repeated double kml_bounding_box = 5 [packed = true];
+    optional Mesh water_mesh = 6;
+    repeated Mesh overlay_surface_meshes = 7;
+}
+
+message Mesh {
+    optional bytes vertices = 1;
+    optional bytes vertex_alphas = 9;
+    optional bytes texture_coords = 2;
+    optional bytes indices = 3;
+    optional bytes octant_ranges = 4;
+    optional bytes layer_counts = 5;
+    repeated Texture texture = 6;
+    optional bytes texture_coordinates = 7;
+    repeated float uv_offset_and_scale = 10 [packed = true];
+    optional bytes layer_and_octant_counts = 8;
+    optional bytes normals = 11;
+    optional bytes normals_dev = 16;
+    optional uint32 mesh_id = 12;
+    optional bytes skirt_flags = 13;
+    
+    enum Layer {
+        OVERGROUND = 0;
+        TERRAIN_BELOW_WATER = 1;
+        TERRAIN_ABOVE_WATER = 2;
+        TERRAIN_HIDDEN = 3;
+        WATER = 4;
+        WATER_SKIRTS = 5;
+        WATER_SKIRTS_INVERTED = 6;
+        OVERLAY_SURFACE = 7;
+        OVERLAY_SURFACE_SKIRTS = 8;
+        NUM_LAYERS = 9;
+    }
+    
+    enum LayerMask {
+        TERRAIN_WITH_OVERGROUND = 7;
+        TERRAIN_WITH_WATER = 28;
+        TERRAIN_WITHOUT_WATER = 14;
+    }
+}
+
+message Texture {
+    repeated bytes data = 1;
+    
+    optional Format format = 2;
+    enum Format {
+        JPG = 1;
+        DXT1 = 2;
+        ETC1 = 3;
+        PVRTC2 = 4;
+        PVRTC4 = 5;
+        CRN_DXT1 = 6;
+    }
+    
+    optional uint32 width = 3 [default = 256];
+    optional uint32 height = 4 [default = 256];
+    
+    optional ViewDirection view_direction = 5;
+    enum ViewDirection {
+        NADIR = 0;
+        NORTH_45 = 1;
+        EAST_45 = 2;
+        SOUTH_45 = 3;
+        WEST_45 = 4;
+    }
+    
+    optional uint32 mesh_id = 6;
+}
+
+message TextureData {
+    optional NodeKey node_key = 1;
+    repeated Texture textures = 2;
+}
+
+message Copyrights {
+    repeated Copyright copyrights = 1;
+}
+
+message Copyright {
+    optional uint32 id = 1;
+    optional string text = 2;
+    optional string text_clean = 3;
+}
+
+message PlanetoidMetadata {
+    optional NodeMetadata root_node_metadata = 1;
+    optional float radius = 2;
+    optional float min_terrain_altitude = 3;
+    optional float max_terrain_altitude = 4;
+}
