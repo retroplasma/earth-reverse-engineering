@@ -71,6 +71,7 @@ NodeData:
  - Texture:
     - Format 1: JPEG
     - Format 6: S3 DXT1 RGB
+ - Raw format: see proto/README.md
 BulkMetaData:
   - Oriented Bounding Box
     - Dump OBB to obj: https://gist.github.com/retroplasma/5698808bfaa63ffd03f751a84fa6ce14
