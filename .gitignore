@@ -62,3 +62,13 @@ typings/
 
 # other
 downloaded_files/
+
+client/main
+*.exe
+*.dll
+*.idb
+*.pdb
+*.dSYM
+*.pb.h
+*.pb.cc
+client/cache
