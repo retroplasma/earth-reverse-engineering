@@ -8,8 +8,8 @@ struct rocktree_t {
 	struct node_t {
 		NodeDataRequest request;
 		bool can_have_data;
-		bool downloaded;
-		bool downloading;
+		std::atomic<bool> downloaded;
+		std::atomic<bool> downloading;
 
 		float meters_per_texel;
 		OrientedBoundingBox obb;
@@ -38,8 +38,8 @@ struct rocktree_t {
 	
 	struct bulk_t {
 		BulkMetadataRequest request;
-		bool downloaded;		
-		bool downloading;
+		std::atomic<bool> downloaded;
+		std::atomic<bool> downloading;
 
 		Vector3f head_node_center;
 		
@@ -50,5 +50,5 @@ struct rocktree_t {
 	float radius;
 	bulk_t *root_bulk;
 	std::unique_ptr<PlanetoidMetadata> _metadata;
-	bool downloaded;
+	std::atomic<bool> downloaded;
 };
