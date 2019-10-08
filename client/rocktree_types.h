@@ -5,11 +5,40 @@ struct rocktree_t {
 		texture_format_rgb = 1,
 		texture_format_dxt1 = 2,
 	};
+	struct bulk_t;
 	struct node_t {
 		NodeDataRequest request;
 		bool can_have_data;
 		std::atomic<bool> downloaded;
 		std::atomic<bool> downloading;
+		bulk_t* parent;
+
+		void setNotDownloadedYet() {
+			downloaded = false;
+			downloading = false;			
+		}
+
+		void setStartedDownloading() {
+			if (parent) parent->downloading_ctr++;
+			downloading = true;
+		}
+
+		void setFinishedDownloading() {
+			downloaded = true;
+			if (parent) parent->downloaded_ctr++;
+			downloading = false;
+			if (parent) parent->downloading_ctr--;
+		}
+
+		void setFailedDownloading() {
+			downloading = false;
+			if (parent) parent->downloading_ctr--;
+		}
+
+		void setDeleted() {
+			downloaded = false;			
+			if (parent) parent->downloaded_ctr--;
+		}
 
 		float meters_per_texel;
 		OrientedBoundingBox obb;
@@ -40,12 +69,44 @@ struct rocktree_t {
 		BulkMetadataRequest request;
 		std::atomic<bool> downloaded;
 		std::atomic<bool> downloading;
+		bulk_t* parent;
+
+		void setNotDownloadedYet() {
+			downloaded = false;
+			downloading = false;			
+		}
+
+		void setStartedDownloading() {
+			if (parent) parent->downloading_ctr++;
+			downloading = true;
+		}
+
+		void setFinishedDownloading() {
+			downloaded = true;
+			if (parent) parent->downloaded_ctr++;
+			downloading = false;
+			if (parent) parent->downloading_ctr--;
+		}
+
+		void setFailedDownloading() {
+			downloading = false;
+			if (parent) parent->downloading_ctr--;
+		}
+
+		void setDeleted() {
+			downloaded = false;
+			if (parent) parent->downloaded_ctr--;
+		}
 
 		Vector3f head_node_center;
 		
 		std::unique_ptr<BulkMetadata> _metadata;
-		std::map<std::string, node_t *> nodes;
-		std::map<std::string, bulk_t *> bulks;
+
+		std::atomic<int> downloading_ctr;
+		std::atomic<int> downloaded_ctr;
+
+		std::map<std::string, std::unique_ptr<node_t>> nodes;
+		std::map<std::string, std::unique_ptr<bulk_t>> bulks;
 	};
 	float radius;
 	bulk_t *root_bulk;

@@ -40,7 +40,8 @@ void loadPlanet() {
 		auto bulk = planetoid->root_bulk;
 		assert(!bulk->downloading);
 		assert(!bulk->downloaded);
-		bulk->downloading = true;		
+		bulk->parent = nullptr;
+		bulk->setStartedDownloading();
 		getBulk(bulk->request, bulk, [=](auto _) { /* todo rm cb */ });
 	});
 }
@@ -192,9 +193,13 @@ void drawPlanet(gl_ctx_t &ctx) {
 	std::map<std::string, rocktree_t::node_t *> potential_nodes;
 	//std::multimap<double, rocktree_t::node_t *> dist_nodes;
 
-	// todo: collect garbage
-	// todo: abort emscripten_fetch_close() https://emscripten.org/docs/api_reference/fetch.html 	
-	// todo: workers instead of shared mem https://emscripten.org/docs/api_reference/emscripten.h.html#worker-api
+	// todo: improve download order
+	// todo: abort emscripten_fetch_close() https://emscripten.org/docs/api_reference/fetch.html
+	//       and/or emscripten coroutine fetch semaphore	
+	// todo: purge branches less aggressively	
+	// todo: workers instead of shared mem https://emscripten.org/docs/api_reference/emscripten.h.html#worker-api	
+
+	std::map<std::string, rocktree_t::bulk_t *> potential_bulks;
 
 	// node culling and level of detail using breadth-first search
 	for (;;) {
@@ -207,22 +212,24 @@ void drawPlanet(gl_ctx_t &ctx) {
 				auto bulk_kv = bulk->bulks.find(rel);
 				auto has_bulk = bulk_kv != bulk->bulks.end();
 				if (!has_bulk) continue;
-				auto b = bulk_kv->second;
+				auto b = bulk_kv->second.get();
 				if (b->downloading) continue;
 				if (!b->downloaded) {
-					b->downloading = true;
+					b->setStartedDownloading();
 					getBulk(b->request, b, [=](std::unique_ptr<BulkMetadata> bulk_metadata) { /* todo rm cb */ });
 					continue;
 				}
 				bulk = b;
 			}
+			potential_bulks[cur] = bulk;
+						
 			for(auto o : octs) {
 				auto nxt = cur + o;				
 				auto nxt_rel = nxt.substr (floor((nxt.size() - 1) / 4) * 4, 4);
 				auto node_kv = bulk->nodes.find(nxt_rel);
 				if (node_kv == bulk->nodes.end()) // node at "nxt" doesn't exist
 					continue;				
-				auto node = node_kv->second;						
+				auto node = node_kv->second.get();						
 
 				// cull outside frustum using obb
 				// todo: check if it could cull more
@@ -272,14 +279,73 @@ void drawPlanet(gl_ctx_t &ctx) {
 		auto node = kv->second;
 		if (node->downloading) continue;
 		if (!node->downloaded) {
-			node->downloading = true;
+			node->setStartedDownloading();
 			getNode(node->request, node, [node](auto _) { /* todo rm cb */ });
 			continue;
 		}
 	}
 
-	// cache buffers for unbuffering
-	static std::map<std::string, rocktree_t::node_t *> bufs;
+	// unbuffer and obsolete nodes
+	std::vector<rocktree_t::bulk_t*> x = {current_bulk};
+	auto buf_cnt = 0, obs_n_cnt = 0, total_n = 0;
+	while(!x.empty()) {
+		auto cur_bulk = x[0]; x.erase(x.begin());
+		// prepare next iteration
+		for (auto &kv : cur_bulk->bulks) {
+			auto b = kv.second.get();
+			if (b->downloading || !b->downloaded) continue;
+			x.emplace(x.begin(), b);
+		}
+		// current iteration
+		for (auto &kv : cur_bulk->nodes) {
+			auto n = kv.second.get();
+			if (n->downloading || !n->downloaded) continue;
+			
+			// just count buffers
+			for (auto &m : n->meshes) { if (m.buffered) { buf_cnt++; break;}}
+			
+			total_n++;
+			auto p = n->request.node_key().path();
+			auto has = potential_nodes.find(p) != potential_nodes.end();
+			if (!has) {
+				// node is obsolete
+				obs_n_cnt++;
+
+				// unbuffer
+				for (auto &mesh : n->meshes) {
+					if (mesh.buffered) unbufferMesh(mesh);
+				}
+				// clean up
+				n->_data = nullptr;
+				n->matrix_globe_from_mesh = Matrix4d::Zero();
+				n->meshes.clear();
+				n->setDeleted();
+			}
+		}
+	}
+
+	// post order dfs purge obsolete bulks
+	auto total_b = 0, obs_b_cnt = 0;	
+	std::function<void(rocktree_t::bulk_t *)> po;
+	po = [&po, &potential_bulks, &obs_b_cnt, &total_b](rocktree_t::bulk_t * b){
+		for (auto &kv : b->bulks){
+			auto b = kv.second.get();
+			if (b->downloading || !b->downloaded) continue;
+			po(b);
+		}
+		total_b++;
+		auto p = b->request.node_key().path();
+		auto has = potential_bulks.find(p) != potential_bulks.end();
+		if (!has) {
+			if (b->downloaded_ctr == 0 && b->downloading_ctr == 0) {
+				b->nodes.clear();
+				b->bulks.clear();
+				b->setDeleted();
+			}			
+		}
+	};
+
+	po(current_bulk);
 
 	// log stuff about buffers
 	{
@@ -287,22 +353,9 @@ void drawPlanet(gl_ctx_t &ctx) {
 		ms += deltaTime;
 		if (ms > 2000) {
 			ms = 0;
-			printf("buffered: %lu\n", bufs.size());
-		}
-	}
-
-	// unbuffer previous nodes
-	for (auto kv = bufs.cbegin(); kv != bufs.cend(); /* ++ see below */)
-	{
-		auto full_path = kv->first;
-		auto node = kv->second;
-		auto has = potential_nodes.find(full_path) != potential_nodes.end();
-		auto unbuffer = !has;
-		if (unbuffer) {
-			for (auto &mesh : node->meshes) unbufferMesh(mesh);
-			bufs.erase(kv++);
-		} else {
-			++kv;
+			printf("buffered: %d, tot_n: %d, tot_b: %d, pot_n: %lu, pot_b: %lu, obs n: %d, obs b: %d\n", 
+				buf_cnt, total_n, total_b, potential_nodes.size(), potential_bulks.size(), obs_n_cnt, obs_b_cnt
+			);
 		}
 	}
 
@@ -336,7 +389,7 @@ void drawPlanet(gl_ctx_t &ctx) {
 			if (!mesh.buffered) bufferMesh(mesh);
 			bindAndDrawMesh(mesh, mask_map[full_path], ctx);
 		}
-		bufs[full_path] = node;
+		//bufs[full_path] = node;
 	}
 }
 

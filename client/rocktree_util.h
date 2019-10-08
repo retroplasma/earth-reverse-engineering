@@ -136,7 +136,7 @@ void getBulk(BulkMetadataRequest req, rocktree_t::bulk_t *b, std::function<void(
 				
 				if (!bulk.ParseFromArray(vec.data(), vec.size())) {
 					printf("download failed\n");
-					b->downloading = false;
+					b->setFailedDownloading();
 					cb(NULL);
 				}			
 				
@@ -200,7 +200,7 @@ void getNode(NodeDataRequest req, rocktree_t::node_t *n, std::function<void(std:
 				
 				if (!node.ParseFromArray(vec.data(), vec.size())) {
 					printf("download failed\n");
-					n->downloading = false;
+					n->setFailedDownloading();
 					cb(NULL);
 				}			
 				

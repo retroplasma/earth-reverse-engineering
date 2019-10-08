@@ -81,7 +81,7 @@ void fetchData(const char* path, int i, void (*thunk)(int i, int error, uint8_t 
 	char* url = (char*)malloc(strlen(base_url) + strlen(path) + 1);
 	strcpy(url, base_url); strcat(url, path);	
 
-	printf("GET %s\n", url);
+	//printf("GET %s\n", url);
 	http_t* request = http_get(url, NULL); 
 	free(url);
 	if (!request) {

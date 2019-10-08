@@ -17,6 +17,11 @@ Controls: Mouse, W, A, S, D and Shift key for boost
 - Run: `./main`
 
 #### TODO:
-- collect garbage: purge previous octree branches
-- abort emscripten_fetch_close() https://emscripten.org/docs/api_reference/fetch.html 	
-- workers instead of shared mem https://emscripten.org/docs/api_reference/emscripten.h.html#worker-api
+
+```
+- improve download order
+- abort emscripten_fetch_close() https://emscripten.org/docs/api_reference/fetch.html
+  and/or emscripten coroutine fetch semaphore	
+- purge branches less aggressively	
+- workers instead of shared mem https://emscripten.org/docs/api_reference/emscripten.h.html#worker-api	
+```

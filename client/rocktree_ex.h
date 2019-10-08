@@ -19,15 +19,17 @@ void populateBulk(rocktree_t::bulk_t *bulk, std::unique_ptr<BulkMetadata> bulk_m
 				? node_meta.bulk_metadata_epoch()
 				: bulk->_metadata->head_node_key().epoch();
 			
-			auto b = new rocktree_t::bulk_t();
-			b->downloaded = false;
-			b->downloading = false;
-			b->request = createBulkMetadataRequest(bulk->request.node_key().path(), aux.path, epoch);
-			bulk->bulks[aux.path] = b;
+			auto b = std::make_unique<rocktree_t::bulk_t>();
+			b->setNotDownloadedYet();
+			b->parent = bulk;
+			b->request = createBulkMetadataRequest(bulk->request.node_key().path(), aux.path, epoch);			
+			bulk->bulks.insert(std::make_pair(aux.path,std::move(b)));
 		}
 
 		if ((has_data || !(aux.flags & NodeMetadata_Flags_LEAF)) && !node_meta.has_oriented_bounding_box()) {
+#ifndef EMSCRIPTEN
 			printf("skip unknown node\n");
+#endif
 		}
 
 		if ((has_data || !(aux.flags & NodeMetadata_Flags_LEAF)) && node_meta.has_oriented_bounding_box()) {
@@ -35,28 +37,26 @@ void populateBulk(rocktree_t::bulk_t *bulk, std::unique_ptr<BulkMetadata> bulk_m
 				? node_meta.meters_per_texel()
 				: bulk->_metadata->meters_per_texel(aux.level - 1);		
 			
-			auto n = new rocktree_t::node_t();
-			n->downloaded = false;
-			n->downloading = false;
+			auto n = std::make_unique<rocktree_t::node_t>();
+			n->setNotDownloadedYet();
+			n->parent = bulk;
 			n->can_have_data = has_data;
 			if (has_data) {
 				n->request = createNodeDataRequest(bulk->request.node_key().path(), *(bulk->_metadata), node_meta);
 			}
 			n->meters_per_texel = meters_per_texel;
 			n->obb = unpackObb(node_meta.oriented_bounding_box(), bulk->head_node_center, meters_per_texel);
-			bulk->nodes[aux.path] = n;						
+			bulk->nodes.insert(std::make_pair(aux.path,std::move(n)));
 		}
 	}
-	bulk->downloaded = true;
-	bulk->downloading = false;	
+	bulk->setFinishedDownloading();
 	bulk->_metadata = nullptr;
 }
 
 void populatePlanetoid(rocktree_t *planetoid, std::unique_ptr<PlanetoidMetadata> planetoid_metadata) {
 	auto bulk = new rocktree_t::bulk_t();
 	bulk->request = createBulkMetadataRequest("", "", planetoid_metadata->root_node_metadata().epoch());
-	bulk->downloaded = false;
-	bulk->downloading = false;
+	bulk->setNotDownloadedYet();
 
 	planetoid->radius = planetoid_metadata->radius();	
 	planetoid->root_bulk = bulk;	
@@ -126,6 +126,5 @@ void populateNode(rocktree_t::node_t *node, std::unique_ptr<NodeData> node_data)
 		m.buffered = false;
 		node->meshes.push_back(m);
 	}
-	node->downloaded = true;	
-	node->downloading = false;
+	node->setFinishedDownloading();
 }
