@@ -242,7 +242,7 @@ void drawPlanet(gl_ctx_t &ctx) {
 				}
 
 				// level of detail
-				{
+				/*{
 					auto obb_center = node->obb.center;
 					auto obb_max_diameter = fmax(fmax(node->obb.extents[0], node->obb.extents[1]), node->obb.extents[2]);			
 					
@@ -259,6 +259,17 @@ void drawPlanet(gl_ctx_t &ctx) {
 					if (diameter_in_clipspace < 0.5 / amplify) {
 						continue;
 					}
+				}*/
+
+				{
+					auto t = Affine3d().Identity();					
+					t.translate(eye + (eye-node->obb.center).norm() * direction);
+					auto m = viewprojection * t;
+					auto s = m(3, 3);
+					auto texels_per_meter = 1.0f / node->meters_per_texel;
+					auto wh = 768; // width < height ? width : height;
+					auto r = (2.0*(1.0/s)) * wh;
+					if (texels_per_meter > r) continue;
 				}
 
 				next_valid.push_back(std::make_pair(nxt, bulk));
