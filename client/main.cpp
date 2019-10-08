@@ -154,16 +154,20 @@ void drawPlanet(gl_ctx_t &ctx) {
 	// rotation
 	int mouse_x, mouse_y;
 	SDL_GetRelativeMouseState(&mouse_x, &mouse_y);
-	double yaw = mouse_x * 0.003;
-	double pitch = -mouse_y * 0.003;
+	double yaw = mouse_x * 0.001;
+	double pitch = -mouse_y * 0.001;
+	auto overhead = direction.dot(-up);
+	if ((overhead > 0.99 && pitch < 0) || (overhead < -0.99 && pitch > 0))
+		pitch = 0;
 	auto pitch_axis = direction.cross(up);
 	auto yaw_axis = direction.cross(pitch_axis);
+	pitch_axis.normalize();
 	AngleAxisd roll_angle(0, Vector3d::UnitZ());
 	AngleAxisd yaw_angle(yaw, yaw_axis);
 	AngleAxisd pitch_angle(pitch, pitch_axis);
 	auto quat = roll_angle * yaw_angle * pitch_angle;
 	auto rotation = quat.matrix();
-	direction = rotation * direction;	
+	direction = (rotation * direction).normalized();
 
 	// movement
 	auto speed_amp = fmin(2600, powf(fmax(0, (altitude - 500)/10000)+1, 1.337)) / 6;
