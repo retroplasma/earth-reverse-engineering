@@ -117,11 +117,20 @@ void getBulk(BulkMetadataRequest req, rocktree_t::bulk_t *b, std::function<void(
 	auto epoch = req.node_key().epoch();
 
 	static std::mutex m;
-	static std::map<int, std::pair<std::function<void(std::unique_ptr<BulkMetadata>)>, rocktree_t::bulk_t *>> map;
+	using p = std::pair<std::function<void(std::unique_ptr<BulkMetadata>)>, rocktree_t::bulk_t *>;
+	static std::map<int, p> map;
 	static int i = 0;
 
 	auto thunk = [](int i, int error, uint8_t *data, size_t len){
-		auto pair = map[i];		
+		p pair;	
+		{	
+#ifndef EMSCRIPTEN
+			std::lock_guard<std::mutex> lockGuard(m);
+#endif
+			auto it = map.find(i);
+			pair = it->second;
+			map.erase(it);
+		}
 		auto cb = pair.first;
 		auto b = pair.second;
   		if (error) {
@@ -138,6 +147,7 @@ void getBulk(BulkMetadataRequest req, rocktree_t::bulk_t *b, std::function<void(
 					printf("download failed\n");
 					b->setFailedDownloading();
 					cb(NULL);
+					return;
 				}			
 				
 				auto bu = std::make_unique<BulkMetadata>(bulk);
@@ -146,15 +156,6 @@ void getBulk(BulkMetadataRequest req, rocktree_t::bulk_t *b, std::function<void(
 
 			}, b, cb, vec);
 		}
-		
-#ifndef EMSCRIPTEN
-		{	
-			std::lock_guard<std::mutex> lockGuard(m);
-			map.erase(i);
-		}	
-#else
-		map.erase(i);
-#endif
 
 	};
 
@@ -182,11 +183,20 @@ void getBulk(BulkMetadataRequest req, rocktree_t::bulk_t *b, std::function<void(
 void getNode(NodeDataRequest req, rocktree_t::node_t *n, std::function<void(std::unique_ptr<NodeData>)> cb) {
 
 	static std::mutex m;
-	static std::map<int, std::pair<std::function<void(std::unique_ptr<NodeData>)>, rocktree_t::node_t *>> map;
+	using p = std::pair<std::function<void(std::unique_ptr<NodeData>)>, rocktree_t::node_t *>;
+	static std::map<int, p> map;
 	static int i = 0;	
 
 	auto thunk = [](int i, int error, uint8_t *data, size_t len){
-		auto pair = map[i];		
+		p pair;	
+		{	
+#ifndef EMSCRIPTEN
+			std::lock_guard<std::mutex> lockGuard(m);
+#endif
+			auto it = map.find(i);
+			pair = it->second;
+			map.erase(it);
+		}	
 		auto cb = pair.first;
 		auto n = pair.second;
   		if (error) {
@@ -202,6 +212,7 @@ void getNode(NodeDataRequest req, rocktree_t::node_t *n, std::function<void(std:
 					printf("download failed\n");
 					n->setFailedDownloading();
 					cb(NULL);
+					return;
 				}			
 				
 				auto nu = std::make_unique<NodeData>(node);
@@ -209,14 +220,6 @@ void getNode(NodeDataRequest req, rocktree_t::node_t *n, std::function<void(std:
 				cb(NULL);
     		}, n, cb, vec);		
 		}
-#ifndef EMSCRIPTEN
-		{	
-			std::lock_guard<std::mutex> lockGuard(m);
-			map.erase(i);
-		}	
-#else
-		map.erase(i);
-#endif
 	};
 
 	auto path = req.node_key().path().c_str();

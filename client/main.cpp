@@ -38,9 +38,7 @@ void loadPlanet() {
 		populatePlanetoid(planetoid, std::move(_metadata));
 		
 		auto bulk = planetoid->root_bulk;
-		assert(!bulk->downloading);
-		assert(!bulk->downloaded);
-		bulk->parent = nullptr;
+		assert(bulk->dl_state == dl_state_stub);		
 		bulk->setStartedDownloading();
 		getBulk(bulk->request, bulk, [=](auto _) { /* todo rm cb */ });
 	});
@@ -96,7 +94,7 @@ void drawPlanet(gl_ctx_t &ctx) {
 	auto planetoid = _planetoid;
 	if (!planetoid) return;
 	if (!planetoid->downloaded) return;
-	if (!planetoid->root_bulk->downloaded) return;	
+	if (planetoid->root_bulk->dl_state != dl_state_downloaded) return;	
 	auto current_bulk = planetoid->root_bulk;
 	auto planet_radius = planetoid->radius;
 
@@ -192,8 +190,8 @@ void drawPlanet(gl_ctx_t &ctx) {
 	auto frustum_planes = getFrustumPlanes(viewprojection); // for obb culling
 
 	const std::string octs[] = { "0", "1", "2", "3", "4", "5", "6", "7" };
-	std::vector<std::pair<std::string, rocktree_t::bulk_t *>> valid = { std::pair<std::string, rocktree_t::bulk_t *>("", current_bulk) };
-	std::vector<std::pair<std::string, rocktree_t::bulk_t *>> next_valid;
+	std::vector<std::pair<std::string, rocktree_t::bulk_t *>> valid = { std::make_pair("", current_bulk) };
+	decltype(valid) next_valid;
 	std::map<std::string, rocktree_t::node_t *> potential_nodes;
 	//std::multimap<double, rocktree_t::node_t *> dist_nodes;
 
@@ -217,12 +215,12 @@ void drawPlanet(gl_ctx_t &ctx) {
 				auto has_bulk = bulk_kv != bulk->bulks.end();
 				if (!has_bulk) continue;
 				auto b = bulk_kv->second.get();
-				if (b->downloading) continue;
-				if (!b->downloaded) {
+				potential_bulks[cur] = b;
+				if (b->dl_state == dl_state_stub) {
 					b->setStartedDownloading();
-					getBulk(b->request, b, [=](std::unique_ptr<BulkMetadata> bulk_metadata) { /* todo rm cb */ });
-					continue;
+					getBulk(b->request, b, [=](auto) {});			
 				}
+				if (b->dl_state != dl_state_downloaded) continue;
 				bulk = b;
 			}
 			potential_bulks[cur] = bulk;
@@ -292,11 +290,9 @@ void drawPlanet(gl_ctx_t &ctx) {
 	//for (auto kv = dist_nodes.rbegin(); kv != dist_nodes.rend(); ++kv) { // reverse order
 	//for (auto kv = dist_nodes.begin(); kv != dist_nodes.end(); ++kv) { // normal order
 		auto node = kv->second;
-		if (node->downloading) continue;
-		if (!node->downloaded) {
+		if (node->dl_state == dl_state_stub) {
 			node->setStartedDownloading();
-			getNode(node->request, node, [node](auto _) { /* todo rm cb */ });
-			continue;
+			getNode(node->request, node, [node](auto) {});
 		}
 	}
 
@@ -308,13 +304,13 @@ void drawPlanet(gl_ctx_t &ctx) {
 		// prepare next iteration
 		for (auto &kv : cur_bulk->bulks) {
 			auto b = kv.second.get();
-			if (b->downloading || !b->downloaded) continue;
+			if (b->dl_state != dl_state_downloaded) continue;
 			x.emplace(x.begin(), b);
 		}
 		// current iteration
 		for (auto &kv : cur_bulk->nodes) {
 			auto n = kv.second.get();
-			if (n->downloading || !n->downloaded) continue;
+			if (n->dl_state != dl_state_downloaded) continue;
 			
 			// just count buffers
 			for (auto &m : n->meshes) { if (m.buffered) { buf_cnt++; break;}}
@@ -345,14 +341,14 @@ void drawPlanet(gl_ctx_t &ctx) {
 	po = [&po, &potential_bulks, &obs_b_cnt, &total_b](rocktree_t::bulk_t * b){
 		for (auto &kv : b->bulks){
 			auto b = kv.second.get();
-			if (b->downloading || !b->downloaded) continue;
-			po(b);
+			if (b->dl_state == dl_state_downloaded)
+				po(b);
 		}
 		total_b++;
 		auto p = b->request.node_key().path();
 		auto has = potential_bulks.find(p) != potential_bulks.end();
 		if (!has) {
-			if (b->downloaded_ctr == 0 && b->downloading_ctr == 0) {
+			if (b->busy_ctr == 0) {
 				b->nodes.clear();
 				b->bulks.clear();
 				b->setDeleted();
@@ -383,7 +379,7 @@ void drawPlanet(gl_ctx_t &ctx) {
 		auto level = strlen(full_path.c_str());
 		assert(level > 0);		
 		assert(node->can_have_data);
-		if (node->downloading) continue;
+		if (node->dl_state != dl_state_downloaded) continue;
 
 		// set octant mask of previous node
 		auto octant = (int)(full_path[level - 1] - '0');

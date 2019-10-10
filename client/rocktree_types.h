@@ -1,5 +1,11 @@
 #include <SDL_opengl.h>
 
+enum dl_state : int {
+	dl_state_stub = 1,
+	dl_state_downloading = 2,
+	dl_state_downloaded = 4,	
+};
+
 struct rocktree_t {
 	enum texture_format : int {
 		texture_format_rgb = 1,
@@ -9,35 +15,30 @@ struct rocktree_t {
 	struct node_t {
 		NodeDataRequest request;
 		bool can_have_data;
-		std::atomic<bool> downloaded;
-		std::atomic<bool> downloading;
+		std::atomic<dl_state> dl_state;
 		bulk_t* parent;
 
 		void setNotDownloadedYet() {
-			downloaded = false;
-			downloading = false;			
+			dl_state = dl_state_stub;
 		}
 
 		void setStartedDownloading() {
-			if (parent) parent->downloading_ctr++;
-			downloading = true;
+			if (parent) parent->busy_ctr++;
+			dl_state = dl_state_downloading;
 		}
 
 		void setFinishedDownloading() {
-			downloaded = true;
-			if (parent) parent->downloaded_ctr++;
-			downloading = false;
-			if (parent) parent->downloading_ctr--;
+			dl_state = dl_state_downloaded;
 		}
 
 		void setFailedDownloading() {
-			downloading = false;
-			if (parent) parent->downloading_ctr--;
+			dl_state = dl_state_stub;
+			if (parent) parent->busy_ctr--;
 		}
 
 		void setDeleted() {
-			downloaded = false;			
-			if (parent) parent->downloaded_ctr--;
+			dl_state = dl_state_stub;
+			if (parent) parent->busy_ctr--;
 		}
 
 		float meters_per_texel;
@@ -67,43 +68,36 @@ struct rocktree_t {
 	
 	struct bulk_t {
 		BulkMetadataRequest request;
-		std::atomic<bool> downloaded;
-		std::atomic<bool> downloading;
+		std::atomic<dl_state> dl_state;
 		bulk_t* parent;
 
 		void setNotDownloadedYet() {
-			downloaded = false;
-			downloading = false;			
+			dl_state = dl_state_stub;
 		}
 
 		void setStartedDownloading() {
-			if (parent) parent->downloading_ctr++;
-			downloading = true;
+			if (parent) parent->busy_ctr++;
+			dl_state = dl_state_downloading;
 		}
 
 		void setFinishedDownloading() {
-			downloaded = true;
-			if (parent) parent->downloaded_ctr++;
-			downloading = false;
-			if (parent) parent->downloading_ctr--;
+			dl_state = dl_state_downloaded;
 		}
 
 		void setFailedDownloading() {
-			downloading = false;
-			if (parent) parent->downloading_ctr--;
+			dl_state = dl_state_stub;
+			if (parent) parent->busy_ctr--;
 		}
 
 		void setDeleted() {
-			downloaded = false;
-			if (parent) parent->downloaded_ctr--;
+			dl_state = dl_state_stub;
+			if (parent) parent->busy_ctr--;
 		}
 
 		Vector3f head_node_center;
 		
 		std::unique_ptr<BulkMetadata> _metadata;
-
-		std::atomic<int> downloading_ctr;
-		std::atomic<int> downloaded_ctr;
+		std::atomic<int> busy_ctr;
 
 		std::map<std::string, std::unique_ptr<node_t>> nodes;
 		std::map<std::string, std::unique_ptr<bulk_t>> bulks;
