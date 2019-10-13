@@ -1,3 +1,3 @@
 [submodule "client/eigen"]
 	path = client/eigen
-	url = https://github.com/PX4/eigen
+	url = https://github.com/eigenteam/eigen-git-mirror
