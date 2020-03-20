@@ -2,12 +2,23 @@
 
 ![header](header.png "Header image: 37.793647, -122.398938")
 
-This is an attempt to reverse-engineer undocumented parts of Google Earth. Main goal is to document the results and to provide code that emerges.
+This is an attempt to reverse-engineer undocumented parts of Google Earth. The goal is to document the results and to provide code that emerges. Similar work is being done for Apple Maps [here](https://github.com/retroplasma/flyover-reverse-engineering).
 
-#### Client
+#### Status
+The focus has been on the 3D satellite mode, which required digging into:
+- URL structures
+- octrees and conversion from geo coordinates
+- Protobuf formats of assets and metadata
+- postprocessing steps (e.g. unpacking of meshes and textures)
+
+Code was written and tested with various regions and cities:
+- Flycam client (native + WebAssembly)
+- OBJ exporter (works without photogrammetry or graphics debuggers)
+
+#### Flycam client
 [here](./client/)
 
-#### Earth to OBJ file downloader
+#### OBJ exporter
 We can dump a textured 3D model (*.obj with *.bmp and *.jpg) using the following scripts. They require [Node.js](https://nodejs.org/en/) v8 and [npm](https://www.npmjs.com/):
 ```sh
 # Install dependencies (tested with node@8.15.0, npm@6.4.1)
