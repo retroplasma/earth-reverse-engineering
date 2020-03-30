@@ -1,5 +1,3 @@
-[![Gitter Chat](https://badges.gitter.im/earth-reverse-engineering/lobby.svg)](https://gitter.im/earth-reverse-engineering/lobby)
-
 ![header](header.png "Header image: 37.793647, -122.398938")
 
 This is an attempt to reverse-engineer undocumented parts of Google Earth. The goal is to document the results and to provide code that emerges. Similar work is being done for Apple Maps [here](https://github.com/retroplasma/flyover-reverse-engineering).
