@@ -1,4 +1,4 @@
-### Flycam Client
+### Flycam client
 
 <img src="https://user-images.githubusercontent.com/46618410/66276031-fbdbd900-e88e-11e9-9643-efacecf1daff.png" width="30%">
 

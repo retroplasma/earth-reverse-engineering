@@ -12,7 +12,7 @@ if [ "$1" == "emscripten" ]; then
 		-o main.html	
 else
 	echo build: native
-	pwd="$(pwd)" && cd .. && ./makeproto.sh && cd "$pwd"
+	pwd="$(pwd)" && cd .. && protoc --cpp_out=client proto/rocktree.proto && cd "$pwd"
 	cd crn && g++ -std=c++14 -c crn.cc -w && cd ..
 
 	CFLAGS="--std=c++14 -g -I. `pkg-config --cflags sdl2 protobuf` -I./eigen/"
