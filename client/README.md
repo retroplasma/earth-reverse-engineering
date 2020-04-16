@@ -4,7 +4,7 @@
 
 #### WebAssembly Demo:
 - [multi-threaded](https://retroplasma.github.io/earth-client-demo/wasm/multi-threaded/) (currently only works in Chrome due to SharedArrayBuffer)
-- [single-threaded](https://retroplasma.github.io/earth-client-demo/wasm/single-threaded/)
+- [single-threaded](https://retroplasma.github.io/earth-client-demo/wasm/single-threaded/) (doesn't work in Firefox Private Mode)
 
 Controls: Mouse, W, A, S, D and Shift key for boost
 
