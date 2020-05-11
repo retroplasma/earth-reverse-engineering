@@ -25,7 +25,8 @@ async function run() {
 
 	let objCtx;
 	if (DUMP_OBJ) {
-		const objDir = path.join(DUMP_OBJ_DIR, `${OCTANTS.join('+')}-${MAX_LEVEL}-${rootEpoch}`);
+		const octName = OCTANTS.length > 4 ? OCTANTS.slice(0,3).join('+') : OCTANTS.join('+');
+		const objDir = path.join(DUMP_OBJ_DIR, `${octName}-${MAX_LEVEL}-${rootEpoch}`);
 		fs.removeSync(objDir);
 		fs.ensureDirSync(objDir);
 		objCtx = initCtxOBJ(objDir);
