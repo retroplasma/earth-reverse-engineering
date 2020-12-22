@@ -25,7 +25,7 @@ async function run() {
 
 	let objCtx;
 	if (DUMP_OBJ) {
-		const octName = OCTANTS.length > 4 ? OCTANTS.slice(0,3).join('+') : OCTANTS.join('+');
+		const octName = OCTANTS.length > 3 ? `${OCTANTS.slice(0,3).join('+')}+etc` : OCTANTS.join('+');
 		const objDir = path.join(DUMP_OBJ_DIR, `${octName}-${MAX_LEVEL}-${rootEpoch}`);
 		fs.removeSync(objDir);
 		fs.ensureDirSync(objDir);
