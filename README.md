@@ -1,6 +1,6 @@
 ![header](header.png "Header image: 37.793647, -122.398938")
 
-This is an attempt to reverse-engineer undocumented parts of Google Earth. The goal is to document the results and to provide code that emerges. Similar work is being done for Apple Maps [here](https://github.com/retroplasma/flyover-reverse-engineering).
+Reverse-engineering undocumented parts of Google Earth. Similar work is done for Apple Maps [here](https://github.com/retroplasma/flyover-reverse-engineering).
 
 #### Status
 The focus has been on the 3D satellite mode, which required digging into:
@@ -10,8 +10,8 @@ The focus has been on the 3D satellite mode, which required digging into:
 - postprocessing steps (e.g. unpacking of meshes and textures)
 
 Code was written and tested with various regions and cities:
-- [Flycam client](./client/) (native + WebAssembly)
-- [Model exporter](./exporter/) (works without photogrammetry or graphics debuggers)
+- [Flycam client](./client/) (C++, native + WebAssembly)
+- [Model exporter](./exporter/) (JS, works without photogrammetry or graphics debuggers)
 
 #### Info
 
