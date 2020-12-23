@@ -152,12 +152,9 @@ function writeNodeOBJ(ctx, node, nodeName, exclude) {
 		const { buffer: buf, extension: ext } = decodeTexture(tex);
 		fs.appendFileSync(path.join(ctx.objDir, 'model.mtl'), `
 			newmtl ${texName}
-			Ka 1.000000 1.000000 1.000000
-			Kd 1.000000 1.000000 1.000000
-			Ks 0.000000 0.000000 0.000000
-			Tr 1.000000
-			illum 1
-			Ns 0.000000
+			Kd 1.000 1.000 1.000
+			d 1.0
+			illum 0
 			map_Kd ${texName}.${ext}
 		`.split('\n').map(s => s.trim()).join('\n'));
 
